@@ -32,7 +32,9 @@ class OpenNNL
         double * _derivatives; // derivatives of output of each neuron
 
         double * _Bs;    // B for IDBD training
+        double * _BsForBias;    // B for IDBD training
         double * _Hs;    // H for IDBD training
+        double * _HsForBias;    // H for IDBD training
 
         /*double activation(double output, int type); // activation function
         double derivative(double x, int type);  // derivative of activation function
@@ -45,8 +47,14 @@ class OpenNNL
         inline void setB(int layer, int neuron, int input, double value);  // set B for current neuron's input
         inline double getB(int layer, int neuron, int input);  // get B of current neuron's input
 
+        inline void setBForBias(int layer, int neuron, double value);  // set B for current neuron's bias
+        inline double getBForBias(int layer, int neuron);  // get B of current neuron's bias
+
         inline void setH(int layer, int neuron, int input, double value); // set H for current neuron's input
         inline double getH(int layer, int neuron, int input);  // get H of current neuron's input
+
+        inline void setHForBias(int layer, int neuron, double value); // set H for current neuron's input
+        inline double getHForBias(int layer, int neuron);  // get H of current neuron's input
 
         inline void setWeight(int layer, int neuron, int input, double value); // set weight for current neuron's input
         inline double getWeight(int layer, int neuron, int input); // get weight current neuron's input
@@ -57,9 +65,12 @@ class OpenNNL
         inline void setDerivative(int layer, int neuron, double value); // sets neuron's derivative value
         inline double getDerivative(int layer, int neuron); // gets neuron's derivative value
 
+        inline int indexByLayerAndNeuron(int layer, int neuron);
+        inline int indexByLayerNeuronAndInput(int layer, int neuron, int input);
+
         double * _calculateWorker(double * inputs); // worker for calculation network outputs
-        double _changeWeightsByBP(double * trainingInputs, double * trainingOutputs);
-        double _changeWeightsByIDBD(double * trainingInputs, double * trainingOutputs);
+        double _changeWeightsByBP(double * trainingInputs, double sample_weight, double * trainingOutputs, double speed);
+        double _changeWeightsByIDBD(double * trainingInputs, double sample_weight, double *trainingOutputs, double speed);
 
     public:
         OpenNNL(const int inptCount, const int lrCount, const int * neuronsInLayer);
