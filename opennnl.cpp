@@ -93,6 +93,16 @@ inline double OpenNNL::getB(int layer, int neuron, int input)
     return _Bs[indexByLayerNeuronAndInput(layer, neuron, input)];
 }
 
+inline void OpenNNL::setBForBias(int layer, int neuron, double value)
+{
+    _BsForBias[indexByLayerAndNeuron(layer, neuron)] = value;
+}
+
+inline double OpenNNL::getBForBias(int layer, int neuron)
+{
+    return _BsForBias[indexByLayerAndNeuron(layer, neuron)];
+}
+
 inline void OpenNNL::setH(int layer, int neuron, int input, double value)
 {
     _Hs[indexByLayerNeuronAndInput(layer, neuron, input)] = value;
@@ -101,6 +111,16 @@ inline void OpenNNL::setH(int layer, int neuron, int input, double value)
 inline double OpenNNL::getH(int layer, int neuron, int input)
 {
     return _Hs[indexByLayerNeuronAndInput(layer, neuron, input)];
+}
+
+inline void OpenNNL::setHForBias(int layer, int neuron, double value)
+{
+    _HsForBias[indexByLayerAndNeuron(layer, neuron)] = value;
+}
+
+inline double OpenNNL::getHForBias(int layer, int neuron)
+{
+    return _HsForBias[indexByLayerAndNeuron(layer, neuron)];
 }
 
 inline void OpenNNL::setWeight(int layer, int neuron, int input, double value)
