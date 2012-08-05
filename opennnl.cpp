@@ -513,3 +513,30 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double sample_weig
     delete[] outputs;
     delete[] derivatives;
 }
+
+double OpenNNL::_doEpoch(int samplesCount, double trainingInputs, double trainingOutputs, int numEpoch, bool isAdaptive)
+{
+    if(isAdaptive)
+    {
+        change_weights_by_IDBD();
+    }
+    else
+    {
+        /*long double x_left = 1.0, x_center = getMaxEpochsCount();
+        long double y_left = m_startRate, y_center = m_finalRate;
+        long double a = (y_left - y_center)
+                        / ((x_left - x_center) * (x_left - x_center));
+        m_rate = y_center + a * ((numEpoch - x_center) * (numEpoch - x_center));*/
+    }
+}
+
+void OpenNNL::_training(int samplesCount, double trainingInputs, double trainingOutputs, int nMaxEpochsCount, bool isAdaptive)
+{
+    for(int i=0;i<nMaxEpochsCount;i++)
+    {
+        if(!_doEpoch(samplesCount, trainingInputs, trainingOutputs, i, isAdaptive))
+        {
+            break;
+        }
+    }
+}

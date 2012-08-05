@@ -72,6 +72,9 @@ class OpenNNL
         double _changeWeightsByBP(double * trainingInputs, double sample_weight, double * trainingOutputs, double speed);
         double _changeWeightsByIDBD(double * trainingInputs, double sample_weight, double *trainingOutputs, double speed);
 
+        double _doEpoch(int samplesCount, double trainingInputs, double trainingOutputs, int numEpoch, bool isAdaptive=true);
+        void _training(int samplesCount, double trainingInputs, double trainingOutputs, int nMaxEpochsCount, bool isAdaptive=true);
+
     public:
         OpenNNL(const int inptCount, const int lrCount, const int * neuronsInLayer);
         OpenNNL(const char * filename); // creates object and loads network and its parameters from file
