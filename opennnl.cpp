@@ -514,7 +514,7 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double sample_weig
     delete[] derivatives;
 }
 
-double OpenNNL::_doEpoch(int samplesCount, double trainingInputs, double trainingOutputs, int numEpoch, bool isAdaptive)
+double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, bool isAdaptive)
 {
     if(isAdaptive)
     {
@@ -530,7 +530,7 @@ double OpenNNL::_doEpoch(int samplesCount, double trainingInputs, double trainin
     }
 }
 
-void OpenNNL::_training(int samplesCount, double trainingInputs, double trainingOutputs, int nMaxEpochsCount, bool isAdaptive)
+void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int nMaxEpochsCount, bool isAdaptive)
 {
     for(int i=0;i<nMaxEpochsCount;i++)
     {
