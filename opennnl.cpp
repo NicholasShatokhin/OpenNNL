@@ -200,7 +200,7 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double * inputs, double * ou
 
 }
 
-double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double sample_weight, double * trainingOutputs, double speed)
+double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double sample_weight, double speed)
 {
     int i, j, k, nInputsCount;
     double cur_output, cur_input, cur_error;
@@ -514,27 +514,39 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double sample_weig
     delete[] derivatives;
 }
 
-double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, bool isAdaptive)
+double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, bool isAdaptive)
 {
-    if(isAdaptive)
+    double * currentSampleInputs = new double[_inputsCount];
+    double * currentSampleOutputs = new double[_outputsCount];
+
+    for(int sample=0;sample<samplesCount;sample++)
     {
-        change_weights_by_IDBD();
+        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount);
+        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount);
+
+        if(isAdaptive)
+        {
+            _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, 1, speed);
+        }
+        else
+        {
+            /*long double x_left = 1.0, x_center = getMaxEpochsCount();
+            long double y_left = m_startRate, y_center = m_finalRate;
+            long double a = (y_left - y_center)
+                            / ((x_left - x_center) * (x_left - x_center));
+            m_rate = y_center + a * ((numEpoch - x_center) * (numEpoch - x_center));*/
+        }
     }
-    else
-    {
-        /*long double x_left = 1.0, x_center = getMaxEpochsCount();
-        long double y_left = m_startRate, y_center = m_finalRate;
-        long double a = (y_left - y_center)
-                        / ((x_left - x_center) * (x_left - x_center));
-        m_rate = y_center + a * ((numEpoch - x_center) * (numEpoch - x_center));*/
-    }
+
+    delete[] currentSampleInputs;
+    delete[] currentSampleOutputs;
 }
 
-void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int nMaxEpochsCount, bool isAdaptive)
+void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int nMaxEpochsCount, double speed, bool isAdaptive)
 {
     for(int i=0;i<nMaxEpochsCount;i++)
     {
-        if(!_doEpoch(samplesCount, trainingInputs, trainingOutputs, i, isAdaptive))
+        if(!_doEpoch(samplesCount, trainingInputs, trainingOutputs, i, speed, isAdaptive))
         {
             break;
         }
