@@ -74,7 +74,7 @@ class OpenNNL
         double _changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double sample_weight, double speed);
 
         double _doEpoch(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, bool isAdaptive=true);
-        void _training(int samplesCount, double * trainingInputs, double * trainingOutputs, int nMaxEpochsCount, double speed, bool isAdaptive=true);
+        void _training(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, bool isAdaptive=true);
 
     public:
         OpenNNL(const int inptCount, const int lrCount, const int * neuronsInLayer);
@@ -106,9 +106,9 @@ class OpenNNL
 
         /*void training(int trainingSetSize, double ** trainingInputs, double **trainingOutputs, double speed, double error, int maxEpochs);
         void trainingByFile(const char * filename, double speed, double error, int maxEpochs);
-        void trainingByFileBatch(const char * filename, double speed, double error, int maxEpochs, int batchSize=0, int offset=0);
+        void trainingByFileBatch(const char * filename, double speed, double error, int maxEpochs, int batchSize=0, int offset=0);*/
 
-        void trainingIDBD(double * trainingInputs, double *trainingOutputs, double speed, double error);*/
+        void trainingIDBD(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error);
 
         void setInputs(double * in);    // copies in to inputs
         void setInputsRef(double * in);    // sets inputs by ref in argument (data must be alive while OpenNNL's object lives)

@@ -542,13 +542,18 @@ double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * tra
     delete[] currentSampleOutputs;
 }
 
-void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int nMaxEpochsCount, double speed, bool isAdaptive)
+void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, bool isAdaptive)
 {
-    for(int i=0;i<nMaxEpochsCount;i++)
+    for(int i=0;i<maxEpochsCount;i++)
     {
         if(!_doEpoch(samplesCount, trainingInputs, trainingOutputs, i, speed, isAdaptive))
         {
             break;
         }
     }
+}
+
+void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
+{
+    _training(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed, true);
 }
