@@ -68,6 +68,14 @@ class OpenNNL
         inline void setDerivative(int layer, int neuron, double value); // sets neuron's derivative value
         inline double getDerivative(int layer, int neuron); // gets neuron's derivative value
 
+        void resetHs();
+        void resetHsForBias();
+        void resetHsAndHsForBias();
+
+        void randomizeBs();
+        void randomizeBsForBias();
+        void randomizeBsAndBsForBias();
+
         inline int indexByLayerAndNeuron(int layer, int neuron);
         inline int indexByLayerNeuronAndInput(int layer, int neuron, int input);
 

@@ -39,6 +39,9 @@ OpenNNL::OpenNNL(const int inputsCount, const int layersCount, const int * neuro
 
     _Bs = new double[_weightsCount];
     _Hs = new double[_weightsCount];
+
+    _BsForBias = new double[_neuronsCount];
+    _HsForBias = new double[_neuronsCount];
 }
 
 OpenNNL::~OpenNNL()
@@ -54,6 +57,8 @@ OpenNNL::~OpenNNL()
     delete[] _neuronsBiases;
     delete[] _Bs;
     delete[] _Hs;
+    delete[] _BsForBias;
+    delete[] _HsForBias;
 }
 
 void OpenNNL::printDebugInfo()
@@ -245,11 +250,10 @@ double * OpenNNL::_calculateWorker(double *inpt)
                 inputs[j] += temp[j*inputsCount+k];
             }
 
-            //printf("%e\n", inputs[j]);
             inputs[j] = activation(inputs[j]);
 
         }
-        printf("\n\n");
+
         inputsCount = _neuronsPerLayerCount[i];
         delete[] temp;
     }
@@ -279,9 +283,52 @@ double * OpenNNL::calculateRef(double *inputs)
     return _calculateWorker(inputs);
 }
 
-void OpenNNL::calculateNeuronsOutputsAndDerivatives(double * inputs, double * outputs, double * derivatives)
+void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *outputs, double *derivatives)
 {
+    int inputsCount, neuronIndex = 0;
+    double * temp;
+    double * inputs = new double[_inputsCount];
 
+    memcpy(inputs, inpt, sizeof(double)*_inputsCount);
+
+    inputsCount = _inputsCount;
+
+    for(int i=0;i<_layersCount;i++)
+    {
+        temp = new double[_neuronsPerLayerCount[i]*inputsCount];
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            for(int k=0;k<inputsCount;k++)
+            {
+                temp[j*inputsCount+k] = inputs[k] * _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)];
+            }
+        }
+
+        delete[] inputs;
+
+        inputs = new double[_neuronsPerLayerCount[i]];
+
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            inputs[j] = 0;
+
+            for(int k=0;k<inputsCount;k++)
+            {
+                inputs[j] += temp[j*inputsCount+k];
+            }
+
+            outputs[neuronIndex] = inputs[j] = activation(inputs[j]);
+            derivatives[neuronIndex] = activation_derivative(inputs[j]);
+
+            neuronIndex++;
+        }
+
+        inputsCount = _neuronsPerLayerCount[i];
+
+        delete[] temp;
+    }
+
+    delete[] inputs;
 }
 
 double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double sample_weight, double speed)
@@ -294,6 +341,9 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     double * localGradients = new double[_neuronsCount];
     double * outputs = new double[_neuronsCount];
     double * derivatives = new double[_neuronsCount];
+
+    resetHsAndHsForBias();
+    randomizeBsAndBsForBias();
 
     calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
 
@@ -309,6 +359,7 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
             localGradients[indexByLayerAndNeuron(i, j)] = cur_error * derivatives[indexByLayerAndNeuron(i, j)];
 
             dB = speed * localGradients[indexByLayerAndNeuron(i, j)] * getHForBias(i, j);
+
             if (dB > 2.0)
             {
                 dB = 2.0;
@@ -605,6 +656,7 @@ double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * tra
 
     for(int sample=0;sample<samplesCount;sample++)
     {
+
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
@@ -645,4 +697,42 @@ void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *tr
 void OpenNNL::getOutputs(double * out)
 {
     memcpy(out, _outputs, sizeof(double)*_outputsCount);
+}
+
+void OpenNNL::resetHs()
+{
+    for(int i=0;i<_weightsCount;i++)
+        _Hs[i] = 0;
+}
+
+void OpenNNL::resetHsForBias()
+{
+    for(int i=0;i<_neuronsCount;i++)
+        _HsForBias[i] = 0;
+}
+
+void OpenNNL::resetHsAndHsForBias()
+{
+    resetHs();
+    resetHsForBias();
+}
+
+void OpenNNL::randomizeBs()
+{
+    initialize_random_generator();
+    for(int i=0;i<_weightsCount;i++)
+        _Bs[i] = unified_random();
+}
+
+void OpenNNL::randomizeBsForBias()
+{
+    initialize_random_generator();
+    for(int i=0;i<_neuronsCount;i++)
+        _BsForBias[i] = unified_random();
+}
+
+void OpenNNL::randomizeBsAndBsForBias()
+{
+    randomizeBs();
+    randomizeBsForBias();
 }

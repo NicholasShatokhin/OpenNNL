@@ -73,7 +73,7 @@ int main()
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
     opennnl->randomizeWeightsAndBiases();
 
-    //opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
+    opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1000, SPEED, ERROR);
 
     opennnl->printDebugInfo();
 
