@@ -10,6 +10,8 @@
 
 using namespace std;
 
+typedef enum {LIN, SIG} TActivationKind;
+
 class OpenNNL
 {
 
@@ -68,6 +70,9 @@ class OpenNNL
 
         inline int indexByLayerAndNeuron(int layer, int neuron);
         inline int indexByLayerNeuronAndInput(int layer, int neuron, int input);
+
+        inline double activation(double x, TActivationKind kind=SIG);
+        inline double activation_derivative(double x, TActivationKind kind=SIG);
 
         double * _calculateWorker(double * inputs); // worker for calculation network outputs
         double _changeWeightsByBP(double * trainingInputs, double sample_weight, double * trainingOutputs, double speed);

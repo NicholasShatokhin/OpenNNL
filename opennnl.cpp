@@ -190,9 +190,93 @@ void OpenNNL::randomizeWeightsAndBiases()
     this->randomizeBiases();
 }
 
-double * OpenNNL::calculate(double * inputs)
+/*****************************************************************************/
+/* Вычислить активационную функцию y(x) = 2x / (1 + abs(x)). */
+/*****************************************************************************/
+inline double OpenNNL::activation(double x, TActivationKind kind)
 {
+    return ((kind == SIG) ? (2.0 * x / (1 + fabs(x))):x);
+}
 
+/*****************************************************************************/
+/* Вычислить производную активационной функции y(x) по формуле:
+   dy(x)         2.0
+   ----- = ---------------.
+    dx     (1 + abs(x))^2
+*/
+/*****************************************************************************/
+inline double OpenNNL::activation_derivative(double x, TActivationKind kind)
+{
+    double temp = 1.0 + fabs(x);
+    return ((kind == SIG) ? (2.0 / (temp * temp)):1.0);
+}
+
+double * OpenNNL::_calculateWorker(double *inpt)
+{
+    int inputsCount;
+    double * temp;
+    double * inputs = new double[_inputsCount];
+
+    memcpy(inputs, inpt, sizeof(double)*_inputsCount);
+
+    inputsCount = _inputsCount;
+
+    for(int i=0;i<_layersCount;i++)
+    {
+        temp = new double[_neuronsPerLayerCount[i]*inputsCount];
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            for(int k=0;k<inputsCount;k++)
+            {
+            temp[j*inputsCount+k] = inputs[k] * _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)];
+            }
+        }
+
+        delete[] inputs;
+
+        inputs = new double[_neuronsPerLayerCount[i]];
+
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            inputs[j] = 0;
+
+            for(int k=0;k<inputsCount;k++)
+            {
+                inputs[j] += temp[j*inputsCount+k];
+            }
+
+            //printf("%e\n", inputs[j]);
+            inputs[j] = activation(inputs[j]);
+
+        }
+        printf("\n\n");
+        inputsCount = _neuronsPerLayerCount[i];
+        delete[] temp;
+    }
+
+    memcpy(_outputs, inputs, sizeof(double)*inputsCount);
+
+    delete[] inputs;
+
+    return _outputs;
+}
+
+double * OpenNNL::calculate(double *inputs)
+{
+    if(inputs)
+    {
+        memcpy(_inputs, inputs, _inputsCount*sizeof(double));
+    }
+
+    return _calculateWorker(_inputs);
+}
+
+double * OpenNNL::calculateRef(double *inputs)
+{
+    if(!inputs)
+        inputs = _inputs;
+
+    return _calculateWorker(inputs);
 }
 
 void OpenNNL::calculateNeuronsOutputsAndDerivatives(double * inputs, double * outputs, double * derivatives)
@@ -521,8 +605,8 @@ double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * tra
 
     for(int sample=0;sample<samplesCount;sample++)
     {
-        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount);
-        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount);
+        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
+        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
         if(isAdaptive)
         {
@@ -556,4 +640,9 @@ void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trai
 void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
 {
     _training(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed, true);
+}
+
+void OpenNNL::getOutputs(double * out)
+{
+    memcpy(out, _outputs, sizeof(double)*_outputsCount);
 }
