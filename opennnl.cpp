@@ -250,6 +250,8 @@ double * OpenNNL::_calculateWorker(double *inpt)
                 inputs[j] += temp[j*inputsCount+k];
             }
 
+            //inputs[j]  += _neuronsBiases[indexByLayerAndNeuron(i, j)];
+
             inputs[j] = activation(inputs[j]);
 
         }
@@ -317,6 +319,8 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
                 inputs[j] += temp[j*inputsCount+k];
             }
 
+            //inputs[j] += _neuronsBiases[indexByLayerAndNeuron(i, j)];
+
             outputs[neuronIndex] = inputs[j] = activation(inputs[j]);
             derivatives[neuronIndex] = activation_derivative(inputs[j]);
 
@@ -331,7 +335,63 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
     delete[] inputs;
 }
 
-double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double sample_weight, double speed)
+double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
+{
+    double * localGradients = new double[_neuronsCount];
+    double * outputs = new double[_neuronsCount];
+    double * derivatives = new double[_neuronsCount];
+
+    calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
+
+    for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++)
+    {
+        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+    }
+
+    if(_layersCount > 1)
+    {
+        for(int i=_layersCount-2;i>=0;i--)
+        {
+            for(int j=0;j<_neuronsPerLayerCount[i];j++)
+            {
+                localGradients[indexByLayerAndNeuron(i, j)] = 0;
+
+                for(int k=0;k<_neuronsPerLayerCount[i+1];k++)
+                {
+                    localGradients[indexByLayerAndNeuron(i, j)] += _neuronsInputsWeights[indexByLayerNeuronAndInput(i+1, k, j)]
+                                                                    * localGradients[indexByLayerAndNeuron(i+1, k)];
+                }
+            }
+        }
+    }
+
+    for(int j=0;j<_neuronsPerLayerCount[0];j++)
+    {
+        for(int k=0;k<_inputsCount;k++)
+        {
+            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += speed * localGradients[indexByLayerAndNeuron(0, j)]
+                    * derivatives[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
+        }
+    }
+
+    for(int i=1;i<_layersCount;i++)
+    {
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            for(int k=0;k<_neuronsPerLayerCount[i-1];k++)
+            {
+                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)]
+                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i, j)];
+            }
+        }
+    }
+
+    delete[] localGradients;
+    delete[] outputs;
+    delete[] derivatives;
+}
+
+double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
 {
     int i, j, k, nInputsCount;
     double cur_output, cur_input, cur_error;
@@ -341,9 +401,6 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     double * localGradients = new double[_neuronsCount];
     double * outputs = new double[_neuronsCount];
     double * derivatives = new double[_neuronsCount];
-
-    resetHsAndHsForBias();
-    randomizeBsAndBsForBias();
 
     calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
 
@@ -649,7 +706,7 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     delete[] derivatives;
 }
 
-double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, bool isAdaptive)
+double OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed)
 {
     double * currentSampleInputs = new double[_inputsCount];
     double * currentSampleOutputs = new double[_outputsCount];
@@ -660,38 +717,68 @@ double OpenNNL::_doEpoch(int samplesCount, double * trainingInputs, double * tra
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
-        if(isAdaptive)
-        {
-            _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, 1, speed);
-        }
-        else
-        {
-            /*long double x_left = 1.0, x_center = getMaxEpochsCount();
-            long double y_left = m_startRate, y_center = m_finalRate;
-            long double a = (y_left - y_center)
-                            / ((x_left - x_center) * (x_left - x_center));
-            m_rate = y_center + a * ((numEpoch - x_center) * (numEpoch - x_center));*/
-        }
+        _changeWeightsByBP(currentSampleInputs, currentSampleOutputs, speed, 1);
     }
 
     delete[] currentSampleInputs;
     delete[] currentSampleOutputs;
 }
 
-void OpenNNL::_training(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, bool isAdaptive)
+double OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed)
+{
+    double * currentSampleInputs = new double[_inputsCount];
+    double * currentSampleOutputs = new double[_outputsCount];
+
+    for(int sample=0;sample<samplesCount;sample++)
+    {
+
+        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
+        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
+
+        _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, speed, 1);
+    }
+
+    delete[] currentSampleInputs;
+    delete[] currentSampleOutputs;
+}
+
+void OpenNNL::_trainingBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed)
 {
     for(int i=0;i<maxEpochsCount;i++)
     {
-        if(!_doEpoch(samplesCount, trainingInputs, trainingOutputs, i, speed, isAdaptive))
+        if(!_doEpochBP(samplesCount, trainingInputs, trainingOutputs, i, speed))
         {
             break;
         }
     }
 }
 
+
+void OpenNNL::_trainingIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed)
+{
+    for(int i=0;i<maxEpochsCount;i++)
+    {
+        if(!_doEpochIDBD(samplesCount, trainingInputs, trainingOutputs, i, speed))
+        {
+            break;
+        }
+    }
+}
+
+void OpenNNL::trainingBP(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
+{
+    resetHsAndHsForBias();
+    randomizeBsAndBsForBias();
+
+    _trainingBP(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed);
+}
+
 void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
 {
-    _training(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed, true);
+    resetHsAndHsForBias();
+    randomizeBsAndBsForBias();
+
+    _trainingIDBD(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed);
 }
 
 void OpenNNL::getOutputs(double * out)

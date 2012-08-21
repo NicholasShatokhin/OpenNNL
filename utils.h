@@ -13,5 +13,5 @@ inline double closed_interval_rand(double x0, double x1)
 
 inline double unified_random()
 {
-    return closed_interval_rand(0, 1);
+    return closed_interval_rand(0, 2) - 1;
 }
