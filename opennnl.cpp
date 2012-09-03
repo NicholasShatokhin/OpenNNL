@@ -393,6 +393,62 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
 
 double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
 {
+    double * localGradients = new double[_neuronsCount];
+    double * outputs = new double[_neuronsCount];
+    double * derivatives = new double[_neuronsCount];
+
+    calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
+
+    for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++)
+    {
+        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+    }
+
+    if(_layersCount > 1)
+    {
+        for(int i=_layersCount-2;i>=0;i--)
+        {
+            for(int j=0;j<_neuronsPerLayerCount[i];j++)
+            {
+                localGradients[indexByLayerAndNeuron(i, j)] = 0;
+
+                for(int k=0;k<_neuronsPerLayerCount[i+1];k++)
+                {
+                    localGradients[indexByLayerAndNeuron(i, j)] += _neuronsInputsWeights[indexByLayerNeuronAndInput(i+1, k, j)]
+                                                                    * localGradients[indexByLayerAndNeuron(i+1, k)];
+                }
+            }
+        }
+    }
+
+    for(int j=0;j<_neuronsPerLayerCount[0];j++)
+    {
+        for(int k=0;k<_inputsCount;k++)
+        {
+            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += speed * localGradients[indexByLayerAndNeuron(0, j)]
+                    * derivatives[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
+        }
+    }
+
+    for(int i=1;i<_layersCount;i++)
+    {
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            for(int k=0;k<_neuronsPerLayerCount[i-1];k++)
+            {
+                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)]
+                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
+            }
+        }
+    }
+
+    delete[] localGradients;
+    delete[] outputs;
+    delete[] derivatives;
+}
+
+/*double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
+{
     int i, j, k, nInputsCount;
     double cur_output, cur_input, cur_error;
     double delta_bias, delta_weight;
@@ -451,35 +507,14 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
         {
             nInputsCount = _inputsInCurrentLayer[i];
 
-            /* Для каждого нейрона i-го слоя (цикл по j):
-               1) вычисляем локальный градиент (по формуле для скрытого слоя);
-               2) записываем его в соответствующее место массива
-            m_aLocalGradients1[];
-               3) корректируем веса связей между данным нейроном и всеми
-            нейронами следующего, (i+1)-го слоя (теперь эти веса уже можно
-            менять):
-                  3.1) корректируем параметр Betta для каждой межнейронной
-                       связи;
-                  3.2) вычисляем коэффициент скорости обучения для веса этой
-                       межнейронной связи;
-                  3.3) корректируем вес межнейронной связи;
-                  3.4) корректируем параметр H для межнейронной связи;
-               4) корректируем параметр Betta для смещения нейрона;
-               5) вычисляем коэффициент скорости обучения для смещения нейрона;
-               6) корректируем смещение данного нейрона;
-               7) корректируем параметр H для смещения нейрона. */
             for (j = 0; j < _neuronsPerLayerCount[i]; j++)
             {
-                /* с помощью обратного распространения вычисляем ошибку
-                   нейрона скрытого слоя */
                 cur_output = outputs[indexByLayerAndNeuron(i, j)];
                 cur_error = 0.0;
                 for (k = 0; k < _neuronsPerLayerCount[i+1]; k++)
                 {
                     cur_error += getWeight(i+1,k,j) * localGradients[indexByLayerAndNeuron(i, k)];
 
-                    /* вычисляем новое значение параметра Betta для связи между
-                       j-м нейроном i-го слоя и k-м нейроном (i+1)-го слоя */
                     dB = speed * localGradients[indexByLayerAndNeuron(i, k)] * getH(i+1,k,j) * cur_output;
                     if (dB > 2.0)
                     {
@@ -494,18 +529,12 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
                     }
                     setB(i+1,k,j, getB(i+1,k,j) + dB);
 
-                    /* на основе нового значения Betta вычисляем коэффициент
-                       скорости обучения */
                     cur_rate = exp(getB(i+1,k,j));
                     //cur_rate = m_rate;
 
-                    /* вычисляем новое значение веса связи между j-м нейроном
-                       i-го слоя и k-м нейроном (i+1)-го слоя */
                     delta_weight = cur_rate*cur_output*localGradients[indexByLayerAndNeuron(i, k)];
                     setWeight(i+1,k,j, getWeight(i+1,k,j) + delta_weight);
 
-                    /* вычисляем новое значение параметра H для связи между
-                       j-м нейроном i-го слоя и k-м нейроном (i+1)-го слоя */
                     newH = 1.0 - cur_rate * cur_output * cur_output;
                     if (newH <= 0.0)
                     {
@@ -521,9 +550,6 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
                 // на основе ошибки вычисляем локальный градиент
                 localGradients[indexByLayerAndNeuron(i, j)] = cur_error * derivatives[indexByLayerAndNeuron(i, j)];
 
-                /* вычисляем новое значение параметра Betta для смещения, и на
-                   его основе - значение коэффициента скорости обучения для
-                   этого же смещения */
                 dB = speed * localGradients[indexByLayerAndNeuron(i, j)] * getHForBias(i, j);
                 if (dB > 2.0)
                 {
@@ -558,15 +584,10 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
             }
         }
 
-        /* Сейчас в массиве m_aLocalGradients2[] содержатся локальные градиенты
-        для нейронов первого слоя. Поэтому самое время скорректировать веса
-        всех нейронов первого слоя, и на этом завершить обратный проход. */
         for (j = 0; j < _neuronsPerLayerCount[0]; j++)
         {
             for (k = 0; k < nInputsCount; k++)
             {
-                /* вычисляем новое значение параметра Betta для связи между
-                   k-м входом и j-м нейроном 1-го слоя */
                 dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getH(0,j,k) * trainingInputs[k];
                 if (dB > 2.0)
                 {
@@ -581,20 +602,14 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
                 }
                 setB(0,j,k, getB(0,j,k) + dB);
 
-                /* на основе нового значения Betta вычисляем коэффициент
-                   скорости обучения */
                 cur_rate = exp(getB(0,j,k));
                 //cur_rate = m_rate;
 
                 cur_input = trainingInputs[k];
 
-                /* вычисляем новое значение веса связи между k-м входом и
-                   j-м нейроном 1-го слоя */
                 delta_weight = cur_rate * cur_input * localGradients[indexByLayerAndNeuron(0, j)];
                 setWeight(0, j, k, getWeight(0, j, k) + delta_weight);
 
-                /* вычисляем новое значение параметра H для связи между
-                   k-м входом и j-м нейроном 1-го слоя */
                 newH = 1.0 - cur_rate * cur_input * cur_input;
                 if (newH <= 0.0)
                 {
@@ -614,16 +629,11 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
         // Для каждого нейрона слоя (цикл по j)
         for (j = 0; j < _neuronsPerLayerCount[0]; j++)
         {
-            /* вычисляем ошибку нейрона слоя как разность между реальным и
-               желаемым выходами */
             cur_error = (trainingOutputs[j] - outputs[indexByLayerAndNeuron(0, j)]) * sample_weight;
 
             // вычисляем локальный градиент
             localGradients[indexByLayerAndNeuron(0, j)] = cur_error * derivatives[indexByLayerAndNeuron(0, j)];
 
-            /* вычисляем новое значение параметра Betta для смещения, и на его
-               основе - значение коэффициента скорости обучения для этого же
-               смещения */
             dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getHForBias(0,j);
             if (dB > 2.0)
             {
@@ -658,8 +668,6 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
             // Для всех входов j-го нейрона (цикл по k)
             for (k = 0; k < nInputsCount; k++)
             {
-                /* вычисляем новое значение параметра Betta для связи между
-                   k-м входом и j-м нейроном  */
                 dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getH(0,j,k) * trainingInputs[k];
                 if (dB > 2.0)
                 {
@@ -674,19 +682,13 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
                 }
                 setB(0, j, k, getB(0, j, k) + dB);
 
-                /* на основе нового значения Betta вычисляем коэффициент
-                   скорости обучения */
                 cur_rate = exp(getB(0, j, k));
 
                 cur_input = trainingInputs[k];
 
-                /* вычисляем новое значение веса связи между k-м входом и
-                   j-м нейроном */
                 delta_weight = cur_rate * cur_input * localGradients[indexByLayerAndNeuron(0, j)];
                 setWeight(0,j,k, getWeight(0,j,k) + delta_weight);
 
-                /* вычисляем новое значение параметра H для связи между
-                   k-м входом и j-м нейроном */
                 newH = 1.0 - cur_rate * cur_input * cur_input;
                 if (newH <= 0.0)
                 {
@@ -704,7 +706,7 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     delete[] localGradients;
     delete[] outputs;
     delete[] derivatives;
-}
+}*/
 
 double OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed)
 {
