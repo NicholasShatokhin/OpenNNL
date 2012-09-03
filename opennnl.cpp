@@ -381,7 +381,7 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
             for(int k=0;k<_neuronsPerLayerCount[i-1];k++)
             {
                 _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)]
-                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i, j)];
+                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
             }
         }
     }
