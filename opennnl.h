@@ -86,10 +86,10 @@ class OpenNNL
         double _changeWeightsByBP(double * trainingInputs, double * trainingOutputs, double speed, double sample_weight=1.0);
         double _changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight=1.0);
 
-        double _doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed);
-        double _doEpochIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed);
-        void _trainingBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed);
-        void _trainingIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed);
+        bool _doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, double error);
+        bool _doEpochIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, double error);
+        void _trainingBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, double error);
+        void _trainingIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, double error);
 
     public:
         OpenNNL(const int inptCount, const int lrCount, const int * neuronsInLayer);

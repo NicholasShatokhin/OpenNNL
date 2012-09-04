@@ -9,10 +9,10 @@ using namespace std;
 #define OUTPUTS_COUNT 2
 
 #define TRAINING_SAMPLES_COUNT 21
-#define SPEED 0.01
-#define ERROR 0.01
+#define SPEED 0.015
+#define ERROR 0.004
 
-#define TEST_INPUTS_COUNT 5
+#define TEST_INPUTS_COUNT 9
 
 int main()
 {
@@ -67,13 +67,17 @@ int main()
         1.0, 0.0, 1.0,
         0.0, 1.0, 0.5,
         0.0, 0.5, 1.0,
-        0.2, 0.1, 0.3
+        0.2, 0.1, 0.3,
+        0.0, 1.0, 0.0,
+        1.0, 1.0, 0.0,
+        1.0, 0.5, 0.0,
+        1.0, 1.0, 1.0
     };
 
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
     opennnl->randomizeWeightsAndBiases();
 
-    opennnl->trainingBP(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1000, SPEED, ERROR);
+    opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1000, SPEED, ERROR);
 
     opennnl->printDebugInfo();
 

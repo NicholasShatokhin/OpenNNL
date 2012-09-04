@@ -36,12 +36,6 @@ OpenNNL::OpenNNL(const int inputsCount, const int layersCount, const int * neuro
 
     _neuronsInputsWeights = new double[_weightsCount];
     _neuronsBiases = new double[_neuronsCount];
-
-    _Bs = new double[_weightsCount];
-    _Hs = new double[_weightsCount];
-
-    _BsForBias = new double[_neuronsCount];
-    _HsForBias = new double[_neuronsCount];
 }
 
 OpenNNL::~OpenNNL()
@@ -55,10 +49,6 @@ OpenNNL::~OpenNNL()
     delete[] _derivatives;
     delete[] _neuronsInputsWeights;
     delete[] _neuronsBiases;
-    delete[] _Bs;
-    delete[] _Hs;
-    delete[] _BsForBias;
-    delete[] _HsForBias;
 }
 
 void OpenNNL::printDebugInfo()
@@ -250,7 +240,7 @@ double * OpenNNL::_calculateWorker(double *inpt)
                 inputs[j] += temp[j*inputsCount+k];
             }
 
-            //inputs[j]  += _neuronsBiases[indexByLayerAndNeuron(i, j)];
+            inputs[j]  -= _neuronsBiases[indexByLayerAndNeuron(i, j)];
 
             inputs[j] = activation(inputs[j]);
 
@@ -319,7 +309,7 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
                 inputs[j] += temp[j*inputsCount+k];
             }
 
-            //inputs[j] += _neuronsBiases[indexByLayerAndNeuron(i, j)];
+            inputs[j] -= _neuronsBiases[indexByLayerAndNeuron(i, j)];
 
             outputs[neuronIndex] = inputs[j] = activation(inputs[j]);
             derivatives[neuronIndex] = activation_derivative(inputs[j]);
@@ -337,6 +327,7 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
 
 double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
 {
+    double error = 0, current_error;
     double * localGradients = new double[_neuronsCount];
     double * outputs = new double[_neuronsCount];
     double * derivatives = new double[_neuronsCount];
@@ -345,7 +336,10 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
 
     for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++)
     {
-        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+        current_error = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = current_error * sample_weight * derivatives[indexByLayerAndNeuron(_layersCount-1, j)];
+
+        error += current_error * current_error;
     }
 
     if(_layersCount > 1)
@@ -361,6 +355,8 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
                     localGradients[indexByLayerAndNeuron(i, j)] += _neuronsInputsWeights[indexByLayerNeuronAndInput(i+1, k, j)]
                                                                     * localGradients[indexByLayerAndNeuron(i+1, k)];
                 }
+
+                localGradients[indexByLayerAndNeuron(i, j)] *= derivatives[indexByLayerAndNeuron(i, j)];
             }
         }
     }
@@ -369,9 +365,10 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
     {
         for(int k=0;k<_inputsCount;k++)
         {
-            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += speed * localGradients[indexByLayerAndNeuron(0, j)]
-                    * derivatives[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
+            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += speed * localGradients[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
         }
+
+        _neuronsBiases[indexByLayerAndNeuron(0, j)] -= speed * localGradients[indexByLayerAndNeuron(0, j)];
     }
 
     for(int i=1;i<_layersCount;i++)
@@ -380,19 +377,25 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
         {
             for(int k=0;k<_neuronsPerLayerCount[i-1];k++)
             {
-                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)]
-                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
+                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
             }
+
+            _neuronsBiases[indexByLayerAndNeuron(i, j)] -= speed * localGradients[indexByLayerAndNeuron(i, j)];
         }
     }
 
     delete[] localGradients;
     delete[] outputs;
     delete[] derivatives;
+
+    error /= 2;
+    return error;
 }
 
 double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
 {
+    double error = 0, current_error;
+    double cur_rate, delta, deltaB, deltaH;
     double * localGradients = new double[_neuronsCount];
     double * outputs = new double[_neuronsCount];
     double * derivatives = new double[_neuronsCount];
@@ -401,7 +404,10 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
 
     for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++)
     {
-        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+        current_error = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
+        localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = current_error * sample_weight * derivatives[indexByLayerAndNeuron(_layersCount-1, j)];
+
+        error += current_error * current_error;
     }
 
     if(_layersCount > 1)
@@ -417,6 +423,8 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
                     localGradients[indexByLayerAndNeuron(i, j)] += _neuronsInputsWeights[indexByLayerNeuronAndInput(i+1, k, j)]
                                                                     * localGradients[indexByLayerAndNeuron(i+1, k)];
                 }
+
+                localGradients[indexByLayerAndNeuron(i, j)] *= derivatives[indexByLayerAndNeuron(i, j)];
             }
         }
     }
@@ -425,9 +433,58 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     {
         for(int k=0;k<_inputsCount;k++)
         {
-            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += speed * localGradients[indexByLayerAndNeuron(0, j)]
-                    * derivatives[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
+            deltaB = speed * localGradients[indexByLayerAndNeuron(0, j)] * trainingInputs[k] * getH(0, j, k);
+
+            if (deltaB > 2.0)
+            {
+                deltaB = 2.0;
+            }
+            else
+            {
+                if (deltaB < -2.0)
+                {
+                    deltaB = -2.0;
+                }
+            }
+
+            setB(0, j, k, getB(0, j, k) + deltaB);
+            cur_rate = exp(getB(0, j, k));
+            delta = cur_rate * localGradients[indexByLayerAndNeuron(0, j)] * trainingInputs[k];
+
+            _neuronsInputsWeights[indexByLayerNeuronAndInput(0, j, k)] += delta;
+
+            deltaH = 1 - cur_rate * trainingInputs[k] * trainingInputs[k];
+            if(deltaH <= 0)
+                setH(0, j, k, delta);
+            else
+                setH(0, j, k, getH(0, j, k) * deltaH + delta);
         }
+
+        deltaB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getHForBias(0, j);
+
+        if (deltaB > 2.0)
+        {
+            deltaB = 2.0;
+        }
+        else
+        {
+            if (deltaB < -2.0)
+            {
+                deltaB = -2.0;
+            }
+        }
+
+        setBForBias(0, j, getBForBias(0, j) - deltaB);
+        cur_rate = exp(getBForBias(0, j));
+        delta = cur_rate * localGradients[indexByLayerAndNeuron(0, j)];
+
+        _neuronsBiases[indexByLayerAndNeuron(0, j)] -= delta;
+
+        deltaH = 1 - cur_rate;
+        if(deltaH <= 0)
+            setHForBias(0, j, -delta);
+        else
+            setHForBias(0, j, getHForBias(0, j) * deltaH - delta);
     }
 
     for(int i=1;i<_layersCount;i++)
@@ -436,15 +493,67 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
         {
             for(int k=0;k<_neuronsPerLayerCount[i-1];k++)
             {
-                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += speed * localGradients[indexByLayerAndNeuron(i, j)]
-                        * derivatives[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
+                deltaB = speed * localGradients[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)] * getH(i, j, k);
+
+                if (deltaB > 2.0)
+                {
+                    deltaB = 2.0;
+                }
+                else
+                {
+                    if (deltaB < -2.0)
+                    {
+                        deltaB = -2.0;
+                    }
+                }
+
+                setB(i, j, k, getB(i, j, k) + deltaB);
+                cur_rate = exp(getB(i, j, k));
+                delta = cur_rate * localGradients[indexByLayerAndNeuron(i, j)] * outputs[indexByLayerAndNeuron(i-1, k)];
+
+                _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)] += delta;
+
+                deltaH = 1 - cur_rate * outputs[indexByLayerAndNeuron(i-1, k)] * outputs[indexByLayerAndNeuron(i-1, k)];
+                if(deltaH <= 0)
+                    setH(i, j, k, delta);
+                else
+                    setH(i, j, k, getH(i, j, k) * deltaH + delta);
             }
+
+            deltaB = speed * localGradients[indexByLayerAndNeuron(i, j)] * getHForBias(i, j);
+
+            if (deltaB > 2.0)
+            {
+                deltaB = 2.0;
+            }
+            else
+            {
+                if (deltaB < -2.0)
+                {
+                    deltaB = -2.0;
+                }
+            }
+
+            setBForBias(i, j, getBForBias(i, j) - deltaB);
+            cur_rate = exp(getBForBias(i, j));
+            delta = cur_rate * localGradients[indexByLayerAndNeuron(i, j)];
+
+            _neuronsBiases[indexByLayerAndNeuron(i, j)] -= delta;
+
+            deltaH = 1 - cur_rate;
+            if(deltaH <= 0)
+                setHForBias(i, j, -delta);
+            else
+                setHForBias(i, j, getHForBias(i, j) * deltaH - delta);
         }
     }
 
     delete[] localGradients;
     delete[] outputs;
     delete[] derivatives;
+
+    error /= 2;
+    return error;
 }
 
 /*double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
@@ -708,8 +817,9 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     delete[] derivatives;
 }*/
 
-double OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed)
+bool OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, double minError)
 {
+    double error = 0;
     double * currentSampleInputs = new double[_inputsCount];
     double * currentSampleOutputs = new double[_outputsCount];
 
@@ -719,15 +829,18 @@ double OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * t
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
-        _changeWeightsByBP(currentSampleInputs, currentSampleOutputs, speed, 1);
+        error = _changeWeightsByBP(currentSampleInputs, currentSampleOutputs, speed, 1);
     }
 
     delete[] currentSampleInputs;
     delete[] currentSampleOutputs;
+
+    return (error <= minError);
 }
 
-double OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed)
+bool OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, double minError)
 {
+    double error = 0;
     double * currentSampleInputs = new double[_inputsCount];
     double * currentSampleOutputs = new double[_outputsCount];
 
@@ -737,18 +850,20 @@ double OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double *
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
-        _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, speed, 1);
+        error = _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, speed, 1);
     }
 
     delete[] currentSampleInputs;
     delete[] currentSampleOutputs;
+
+    return (error <= minError);
 }
 
-void OpenNNL::_trainingBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed)
+void OpenNNL::_trainingBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, double error)
 {
     for(int i=0;i<maxEpochsCount;i++)
     {
-        if(!_doEpochBP(samplesCount, trainingInputs, trainingOutputs, i, speed))
+        if(_doEpochBP(samplesCount, trainingInputs, trainingOutputs, i, speed, error))
         {
             break;
         }
@@ -756,11 +871,11 @@ void OpenNNL::_trainingBP(int samplesCount, double * trainingInputs, double * tr
 }
 
 
-void OpenNNL::_trainingIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed)
+void OpenNNL::_trainingIDBD(int samplesCount, double * trainingInputs, double * trainingOutputs, int maxEpochsCount, double speed, double error)
 {
     for(int i=0;i<maxEpochsCount;i++)
     {
-        if(!_doEpochIDBD(samplesCount, trainingInputs, trainingOutputs, i, speed))
+        if(_doEpochIDBD(samplesCount, trainingInputs, trainingOutputs, i, speed, error))
         {
             break;
         }
@@ -769,18 +884,26 @@ void OpenNNL::_trainingIDBD(int samplesCount, double * trainingInputs, double * 
 
 void OpenNNL::trainingBP(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
 {
-    resetHsAndHsForBias();
-    randomizeBsAndBsForBias();
-
-    _trainingBP(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed);
+    _trainingBP(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed, error);
 }
 
 void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *trainingOutputs, int maxEpochsCount, double speed, double error)
 {
+    _Bs = new double[_weightsCount];
+    _Hs = new double[_weightsCount];
+
+    _BsForBias = new double[_neuronsCount];
+    _HsForBias = new double[_neuronsCount];
+
     resetHsAndHsForBias();
     randomizeBsAndBsForBias();
 
-    _trainingIDBD(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed);
+    _trainingIDBD(samplesCount, trainingInputs, trainingOutputs, maxEpochsCount, speed, error);
+
+    delete[] _Bs;
+    delete[] _Hs;
+    delete[] _BsForBias;
+    delete[] _HsForBias;
 }
 
 void OpenNNL::getOutputs(double * out)
