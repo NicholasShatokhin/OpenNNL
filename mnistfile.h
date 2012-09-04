@@ -9,7 +9,7 @@ class MnistFile
 public:
     MnistFile();
 
-    bool openFile(char * filename);
+    bool openFile(char *filename);
     bool closeFile();
 
     bool readRecord(unsigned char * data);
