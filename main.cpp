@@ -12,16 +12,18 @@ using namespace std;
 
 #define TRAINING_SAMPLES_COUNT 21
 #define SPEED 0.015
-#define ERROR 0.01
+#define ERROR 0.005
 
 #define TEST_INPUTS_COUNT 9
+
+int maxArrayElementsIndex(double array[], int count);
 
 void testNetwork1();
 void testNetwork2();
 
 int main()
 {
-    testNetwork1();
+    //testNetwork1();
     testNetwork2();
 
     return 0;
@@ -124,7 +126,8 @@ void testNetwork2()
     cout << "Creating network..." << endl;
     const int layers_count = 3;
     const int inputs_count = 784;
-    int neuronsInLayers[layers_count] = {300, 100, 1};
+    const int outputs_count = 10;
+    int neuronsInLayers[layers_count] = {300, 100, outputs_count};
 
     OpenNNL * opennnl = new OpenNNL(inputs_count, layers_count, neuronsInLayers);
     opennnl->randomizeWeightsAndBiases();
@@ -151,9 +154,10 @@ void testNetwork2()
     unsigned char label;
 
     const int trainingSamplesCount = images.getLength();
+    const double speed = 1 / (double) trainingSamplesCount;
 
     double * trainingInputs = new double[trainingSamplesCount*inputs_count];
-    double * trainingOutputs = new double[trainingSamplesCount];
+    double * trainingOutputs = new double[trainingSamplesCount*outputs_count];
 
     for(int i=0;i<trainingSamplesCount;i++)
     {
@@ -165,7 +169,11 @@ void testNetwork2()
             trainingInputs[i*inputs_count+j] = ((double) image[j] - 127.5) / 127.5;
         }
 
-        trainingOutputs[i] = ((double) label - 4.5) / 4.5;
+        for(int k=0;k<label;k++)
+            trainingOutputs[i*outputs_count+k] = -1;
+        trainingOutputs[i*outputs_count+label] = 1;
+        for(int k=label+1;k<outputs_count;k++)
+            trainingOutputs[i*outputs_count+k] = -1;
     }
 
     images.closeFile();
@@ -173,7 +181,7 @@ void testNetwork2()
 
     cout << "Training..." << endl;
 
-    opennnl->trainingIDBD(trainingSamplesCount, trainingInputs, trainingOutputs, 1000, SPEED, ERROR);
+    opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, 20, speed, ERROR);
 
     delete trainingInputs;
     delete trainingOutputs;
@@ -193,7 +201,7 @@ void testNetwork2()
     const int testSamplesCount = images.getLength();
 
     double * testInputs = new double[inputs_count];
-    double * testOutputs = new double[1];
+    double * testOutputs = new double[outputs_count];
     int outputLabel, correctAnswers=0;
 
     cout << "Testing..." << endl;
@@ -211,12 +219,19 @@ void testNetwork2()
         opennnl->calculate(testInputs);
         opennnl->getOutputs(testOutputs);
 
-        outputLabel = round(testOutputs[0] * 4.5 + 4.5);
-        if(outputLabel == label)
+        outputLabel = maxArrayElementsIndex(testOutputs, outputs_count);
+        if(outputLabel == (int) label)
             correctAnswers++;
         else
         {
-            cout << "Incorrect answer: " << outputLabel << " instead: " << label << endl;
+            cout << i << ": Incorrect answer: " << outputLabel << " instead: " << (int) label << endl;
+
+            cout << "Outputs: ";
+            for(int k=0;k<outputs_count;k++)
+            {
+                cout << testOutputs[i] << " ";
+            }
+            cout << endl;
         }
     }
 
@@ -230,7 +245,24 @@ void testNetwork2()
 
     cout << endl;
     cout << "Correct answers " << correctAnswers << " from " << testSamplesCount << " labels" << endl;
-    cout << "Error rate: " << correctAnswers / testSamplesCount * 100 << "%" << endl;
+    cout << "Error rate: " << ((double) correctAnswers) / ((double) testSamplesCount) * 100 << "%" << endl;
 
     delete opennnl;
+}
+
+int maxArrayElementsIndex(double array[], int count)
+{
+    double maxElement = -10;
+    int index = 0;
+
+    for(int i=0;i<count;i++)
+    {
+        if(array[i] > maxElement)
+        {
+            maxElement = array[i];
+            index = i;
+        }
+    }
+
+    return index;
 }

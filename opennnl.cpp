@@ -162,9 +162,21 @@ void OpenNNL::randomizeWeights()
 {
     initialize_random_generator();
 
-    for(int i=0;i<_weightsCount;i++)
+    /*for(int i=0;i<_weightsCount;i++)
     {
         _neuronsInputsWeights[i] = unified_random();
+    }*/
+
+    int inputs = _inputsCount;
+
+    for(int i=0;i<_layersCount;i++)
+    {
+        for(int j=0;j<inputs*_neuronsPerLayerCount[i];j++)
+        {
+            _neuronsInputsWeights[_inputsInPreviousLayers[i]+j] = unified_random() / sqrt(inputs);
+        }
+
+        inputs = _neuronsPerLayerCount[i];
     }
 
 }
@@ -173,9 +185,20 @@ void OpenNNL::randomizeBiases()
 {
     initialize_random_generator();
 
-    for(int i=0;i<_neuronsCount;i++)
+    /*for(int i=0;i<_neuronsCount;i++)
     {
         _neuronsBiases[i] = unified_random();
+    }*/
+    int inputs = _inputsCount;
+
+    for(int i=0;i<_layersCount;i++)
+    {
+        for(int j=0;j<_neuronsPerLayerCount[i];j++)
+        {
+            _neuronsBiases[_neuronsInPreviousLayers[i]+j] = unified_random() / sqrt(inputs);
+        }
+
+        inputs = _neuronsPerLayerCount[i];
     }
 }
 
@@ -334,7 +357,7 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
 
     calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
 
-    for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++)
+    for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++) // cuda kernel
     {
         current_error = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
         localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = current_error * sample_weight * derivatives[indexByLayerAndNeuron(_layersCount-1, j)];
@@ -346,7 +369,7 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
     {
         for(int i=_layersCount-2;i>=0;i--)
         {
-            for(int j=0;j<_neuronsPerLayerCount[i];j++)
+            for(int j=0;j<_neuronsPerLayerCount[i];j++) // cuda kernel
             {
                 localGradients[indexByLayerAndNeuron(i, j)] = 0;
 
@@ -361,7 +384,7 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
         }
     }
 
-    for(int j=0;j<_neuronsPerLayerCount[0];j++)
+    for(int j=0;j<_neuronsPerLayerCount[0];j++) // this and next cicle for cuda kernel (j*k threads)
     {
         for(int k=0;k<_inputsCount;k++)
         {
@@ -371,7 +394,7 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
         _neuronsBiases[indexByLayerAndNeuron(0, j)] -= speed * localGradients[indexByLayerAndNeuron(0, j)];
     }
 
-    for(int i=1;i<_layersCount;i++)
+    for(int i=1;i<_layersCount;i++) // try to parallelize all three cicles in one kernel. If it's impossible, only two inner
     {
         for(int j=0;j<_neuronsPerLayerCount[i];j++)
         {
@@ -825,7 +848,7 @@ bool OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * tra
 
     for(int sample=0;sample<samplesCount;sample++)
     {
-
+        cout << "Epoch: " << numEpoch << ", Sample: " << sample << endl;
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
@@ -846,7 +869,7 @@ bool OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double * t
 
     for(int sample=0;sample<samplesCount;sample++)
     {
-
+        cout << "Sample: " << sample << endl;
         memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
 
