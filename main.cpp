@@ -181,7 +181,7 @@ void testNetwork2()
 
     cout << "Training..." << endl;
 
-    opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, 20, speed, ERROR);
+    opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, 1, speed, ERROR);
 
     delete trainingInputs;
     delete trainingOutputs;
@@ -245,7 +245,7 @@ void testNetwork2()
 
     cout << endl;
     cout << "Correct answers " << correctAnswers << " from " << testSamplesCount << " labels" << endl;
-    cout << "Error rate: " << ((double) correctAnswers) / ((double) testSamplesCount) * 100 << "%" << endl;
+    cout << "Error rate: " << 100.0 - ((double) correctAnswers) / ((double) testSamplesCount) * 100.0 << "%" << endl;
 
     delete opennnl;
 }
