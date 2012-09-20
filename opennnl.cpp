@@ -235,7 +235,7 @@ double * OpenNNL::_calculateWorker(double *inpt)
     double * temp;
     double * inputs = new double[_inputsCount];
 
-    memcpy(inputs, inpt, sizeof(double)*_inputsCount);
+    memcpy(inputs, inpt, sizeof(*inputs)*_inputsCount);
 
     inputsCount = _inputsCount;
 
@@ -273,7 +273,7 @@ double * OpenNNL::_calculateWorker(double *inpt)
         delete[] temp;
     }
 
-    memcpy(_outputs, inputs, sizeof(double)*inputsCount);
+    memcpy(_outputs, inputs, sizeof(*_outputs)*inputsCount);
 
     delete[] inputs;
 
@@ -284,7 +284,7 @@ double * OpenNNL::calculate(double *inputs)
 {
     if(inputs)
     {
-        memcpy(_inputs, inputs, _inputsCount*sizeof(double));
+        memcpy(_inputs, inputs, _inputsCount*sizeof(*_inputs));
     }
 
     return _calculateWorker(_inputs);
@@ -304,7 +304,7 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
     double * temp;
     double * inputs = new double[_inputsCount];
 
-    memcpy(inputs, inpt, sizeof(double)*_inputsCount);
+    memcpy(inputs, inpt, sizeof(*inputs)*_inputsCount);
 
     inputsCount = _inputsCount;
 
@@ -849,8 +849,8 @@ bool OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * tra
     for(int sample=0;sample<samplesCount;sample++)
     {
         cout << "Epoch: " << numEpoch << ", Sample: " << sample << endl;
-        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
-        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
+        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(*currentSampleInputs));
+        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(*currentSampleOutputs));
 
         error = _changeWeightsByBP(currentSampleInputs, currentSampleOutputs, speed, 1);
     }
@@ -870,8 +870,8 @@ bool OpenNNL::_doEpochIDBD(int samplesCount, double * trainingInputs, double * t
     for(int sample=0;sample<samplesCount;sample++)
     {
         cout << "Sample: " << sample << endl;
-        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(double));
-        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(double));
+        memcpy(currentSampleInputs, trainingInputs+sample*_inputsCount, _inputsCount*sizeof(*currentSampleInputs));
+        memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(*currentSampleOutputs));
 
         error = _changeWeightsByIDBD(currentSampleInputs, currentSampleOutputs, speed, 1);
     }
@@ -931,7 +931,7 @@ void OpenNNL::trainingIDBD(int samplesCount, double * trainingInputs, double *tr
 
 void OpenNNL::getOutputs(double * out)
 {
-    memcpy(out, _outputs, sizeof(double)*_outputsCount);
+    memcpy(out, _outputs, sizeof(*out)*_outputsCount);
 }
 
 void OpenNNL::resetHs()
