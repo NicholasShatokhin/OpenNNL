@@ -2,8 +2,6 @@
 #include <cmath>
 #include <iomanip>
 
-#include <gperftools/profiler.h>
-
 #include "opennnl.h"
 #include "mnistfile.h"
 
@@ -184,9 +182,7 @@ void testNetwork2()
 
     cout << "Training..." << endl;
 
-    ProfilerStart("profiler.out");
     opennnl->trainingIDBD(trainingSamplesCount, trainingInputs, trainingOutputs, 1, speed, ERROR);
-    ProfilerStop();
 
     delete trainingInputs;
     delete trainingOutputs;
