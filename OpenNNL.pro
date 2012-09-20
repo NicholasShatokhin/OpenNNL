@@ -17,3 +17,4 @@ OTHER_FILES += \
     data/mnist/t10k-labels.idx1-ubyte \
     data/mnist/t10k-images.idx3-ubyte
 
+LIBS += -lprofiler

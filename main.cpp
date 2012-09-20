@@ -1,5 +1,8 @@
 #include <iostream>
 #include <cmath>
+#include <iomanip>
+
+#include <gperftools/profiler.h>
 
 #include "opennnl.h"
 #include "mnistfile.h"
@@ -92,7 +95,7 @@ void testNetwork1()
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
     opennnl->randomizeWeightsAndBiases();
 
-    opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1000, SPEED, ERROR);
+    opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
 
     opennnl->printDebugInfo();
 
@@ -153,7 +156,7 @@ void testNetwork2()
     unsigned char * image = new unsigned char[images.getRows()*images.getCols()];
     unsigned char label;
 
-    const int trainingSamplesCount = images.getLength();
+    const int trainingSamplesCount = 2000;//images.getLength();
     const double speed = 1 / (double) trainingSamplesCount;
 
     double * trainingInputs = new double[trainingSamplesCount*inputs_count];
@@ -181,7 +184,9 @@ void testNetwork2()
 
     cout << "Training..." << endl;
 
-    opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, 1, speed, ERROR);
+    ProfilerStart("profiler.out");
+    opennnl->trainingIDBD(trainingSamplesCount, trainingInputs, trainingOutputs, 1, speed, ERROR);
+    ProfilerStop();
 
     delete trainingInputs;
     delete trainingOutputs;
@@ -198,7 +203,7 @@ void testNetwork2()
         return;
     }
 
-    const int testSamplesCount = images.getLength();
+    const int testSamplesCount = 500;//images.getLength();
 
     double * testInputs = new double[inputs_count];
     double * testOutputs = new double[outputs_count];
@@ -226,7 +231,7 @@ void testNetwork2()
         {
             cout << i << ": Incorrect answer: " << outputLabel << " instead: " << (int) label << endl;
 
-            cout << "Outputs: ";
+            cout << "Outputs: " << setprecision(30);
             for(int k=0;k<outputs_count;k++)
             {
                 cout << testOutputs[i] << " ";

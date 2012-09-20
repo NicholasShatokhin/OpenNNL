@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <cstdlib>
 #include <ctime>
 
@@ -15,3 +18,5 @@ inline double unified_random()
 {
     return closed_interval_rand(0, 2) - 1;
 }
+
+#endif // UTILS_H
