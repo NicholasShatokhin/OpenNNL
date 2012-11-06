@@ -971,3 +971,19 @@ void OpenNNL::randomizeBsAndBsForBias()
     randomizeBs();
     randomizeBsForBias();
 }
+
+void OpenNNL::setWeights(double *weights)
+{
+    memcpy(_neuronsInputsWeights, weights, _weightsCount*sizeof(double));
+}
+
+void OpenNNL::setBiases(double *biases)
+{
+    memcpy(_neuronsBiases, biases, _neuronsCount*sizeof(double));
+}
+
+void OpenNNL::setWeightsAndBiases(double *weights, double *biases)
+{
+    setWeights(weights);
+    setBiases(biases);
+}

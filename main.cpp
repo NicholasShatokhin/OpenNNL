@@ -24,8 +24,8 @@ void testNetwork2();
 
 int main()
 {
-    //testNetwork1();
-    testNetwork2();
+    testNetwork1();
+    //testNetwork2();
 
     return 0;
 }
@@ -90,10 +90,20 @@ void testNetwork1()
         1.0, 1.0, 1.0
     };
 
-    OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
-    opennnl->randomizeWeightsAndBiases();
+    double weights[159];
+    double biases[25];
 
-    opennnl->trainingIDBD(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
+    for(int i=0;i<159;i++)
+        weights[i] = 0;
+
+    for(int i=0;i<25;i++)
+        biases[i] = 0;
+
+    OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
+    //opennnl->randomizeWeightsAndBiases();
+    opennnl->setWeightsAndBiases(weights, biases);
+
+    opennnl->trainingBP(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
 
     opennnl->printDebugInfo();
 
