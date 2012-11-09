@@ -246,7 +246,7 @@ double * OpenNNL::_calculateWorker(double *inpt)
         {
             for(int k=0;k<inputsCount;k++)
             {
-            temp[j*inputsCount+k] = inputs[k] * _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)];
+                temp[j*inputsCount+k] = inputs[k] * _neuronsInputsWeights[indexByLayerNeuronAndInput(i, j, k)];
             }
         }
 
@@ -325,17 +325,17 @@ void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *output
 
         for(int j=0;j<_neuronsPerLayerCount[i];j++)
         {
-            inputs[j] = 0;
+            double tempInput = 0;
 
             for(int k=0;k<inputsCount;k++)
             {
-                inputs[j] += temp[j*inputsCount+k];
+                tempInput += temp[j*inputsCount+k];
             }
 
-            inputs[j] -= _neuronsBiases[indexByLayerAndNeuron(i, j)];
+            tempInput -= _neuronsBiases[indexByLayerAndNeuron(i, j)];
 
-            outputs[neuronIndex] = inputs[j] = activation(inputs[j]);
-            derivatives[neuronIndex] = activation_derivative(inputs[j]);
+            outputs[neuronIndex] = inputs[j] = activation(tempInput);
+            derivatives[neuronIndex] = activation_derivative(tempInput);
 
             neuronIndex++;
         }
@@ -357,14 +357,24 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
 
     calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
 
+    /*cout << "outputs:" << endl;
+    for(int i=0;i<_neuronsCount;i++)
+        cout << outputs[i] << endl;
+    cout << "------------" << endl;
+
+    cout << "derivatives:" << endl;
+    for(int i=0;i<_neuronsCount;i++)
+        cout << derivatives[i] << endl;
+    cout << "------------" << endl;*/
+    //cout << "errors: " << endl;
     for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++) // cuda kernel
     {
         current_error = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
         localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = current_error * sample_weight * derivatives[indexByLayerAndNeuron(_layersCount-1, j)];
-
+//cout << current_error * current_error << endl;
         error += current_error * current_error;
     }
-
+    //cout << "----------------" << endl;
     if(_layersCount > 1)
     {
         for(int i=_layersCount-2;i>=0;i--)
@@ -383,6 +393,11 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
             }
         }
     }
+
+    /*cout << "localGradients:" << endl;
+    for(int i=0;i<_neuronsCount;i++)
+        cout << localGradients[i] << endl;
+    cout << "------------" << endl;*/
 
     for(int j=0;j<_neuronsPerLayerCount[0];j++) // this and next cicle for cuda kernel (j*k threads)
     {
@@ -406,6 +421,16 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
             _neuronsBiases[indexByLayerAndNeuron(i, j)] -= speed * localGradients[indexByLayerAndNeuron(i, j)];
         }
     }
+
+    /*cout << "weights:" << endl;
+    for(int i=0;i<_weightsCount;i++)
+        cout << _neuronsInputsWeights[i] << endl;
+    cout << "------------" << endl;
+
+    cout << "biases:" << endl;
+    for(int i=0;i<_neuronsCount;i++)
+        cout << _neuronsBiases[i] << endl;
+    cout << "------------" << endl;*/
 
     delete[] localGradients;
     delete[] outputs;
@@ -579,267 +604,6 @@ double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOu
     return error;
 }
 
-/*double OpenNNL::_changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight)
-{
-    int i, j, k, nInputsCount;
-    double cur_output, cur_input, cur_error;
-    double delta_bias, delta_weight;
-    double cur_rate, dB, newH;
-
-    double * localGradients = new double[_neuronsCount];
-    double * outputs = new double[_neuronsCount];
-    double * derivatives = new double[_neuronsCount];
-
-    calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
-
-    if(_layersCount > 1)
-    {
-        i = _layersCount-1;
-        nInputsCount = _inputsInCurrentLayer[i];
-
-        for (j = 0; j < _neuronsPerLayerCount[i]; j++)
-        {
-            cur_error = (trainingOutputs[j] - outputs[indexByLayerAndNeuron(i, j)]) * sample_weight;
-
-            localGradients[indexByLayerAndNeuron(i, j)] = cur_error * derivatives[indexByLayerAndNeuron(i, j)];
-
-            dB = speed * localGradients[indexByLayerAndNeuron(i, j)] * getHForBias(i, j);
-
-            if (dB > 2.0)
-            {
-                dB = 2.0;
-            }
-            else
-            {
-                if (dB < -2.0)
-                {
-                    dB = -2.0;
-                }
-            }
-            setBForBias(i, j, getBForBias(i, j) + dB);
-            cur_rate = exp(getBForBias(i, j));
-
-            delta_bias = cur_rate * localGradients[indexByLayerAndNeuron(i, j)];
-            setBias(i, j, getBias(i, j) + delta_bias);
-
-            newH = 1.0 - cur_rate;
-            if (newH <= 0.0)
-            {
-                newH = delta_bias;
-            }
-            else
-            {
-                newH = getHForBias(i ,j) * newH + delta_bias;
-            }
-            setHForBias(i, j, newH);
-        }
-
-        // Цикл по всем скрытым слоям от последнего до первого
-        for (i = _layersCount-2; i >= 0; i--)
-        {
-            nInputsCount = _inputsInCurrentLayer[i];
-
-            for (j = 0; j < _neuronsPerLayerCount[i]; j++)
-            {
-                cur_output = outputs[indexByLayerAndNeuron(i, j)];
-                cur_error = 0.0;
-                for (k = 0; k < _neuronsPerLayerCount[i+1]; k++)
-                {
-                    cur_error += getWeight(i+1,k,j) * localGradients[indexByLayerAndNeuron(i, k)];
-
-                    dB = speed * localGradients[indexByLayerAndNeuron(i, k)] * getH(i+1,k,j) * cur_output;
-                    if (dB > 2.0)
-                    {
-                        dB = 2.0;
-                    }
-                    else
-                    {
-                        if (dB < -2.0)
-                        {
-                            dB = -2.0;
-                        }
-                    }
-                    setB(i+1,k,j, getB(i+1,k,j) + dB);
-
-                    cur_rate = exp(getB(i+1,k,j));
-                    //cur_rate = m_rate;
-
-                    delta_weight = cur_rate*cur_output*localGradients[indexByLayerAndNeuron(i, k)];
-                    setWeight(i+1,k,j, getWeight(i+1,k,j) + delta_weight);
-
-                    newH = 1.0 - cur_rate * cur_output * cur_output;
-                    if (newH <= 0.0)
-                    {
-                        newH = delta_weight;
-                    }
-                    else
-                    {
-                        newH = getH(i+1,k,j) * newH + delta_weight;
-                    }
-                    setH(i+1,k,j, newH);
-                }
-
-                // на основе ошибки вычисляем локальный градиент
-                localGradients[indexByLayerAndNeuron(i, j)] = cur_error * derivatives[indexByLayerAndNeuron(i, j)];
-
-                dB = speed * localGradients[indexByLayerAndNeuron(i, j)] * getHForBias(i, j);
-                if (dB > 2.0)
-                {
-                    dB = 2.0;
-                }
-                else
-                {
-                    if (dB < -2.0)
-                    {
-                        dB = -2.0;
-                    }
-                }
-                setBForBias(i, j, getBForBias(i,j)+dB);
-                cur_rate = exp(getBForBias(i, j));
-
-                // корректируем смещение нейрона
-                delta_bias = cur_rate * localGradients[indexByLayerAndNeuron(i, j)];
-
-                setBias(i, j, getBias(i,j) + delta_bias);
-
-                // вычисляем новое значение параметра H для смещения
-                newH = 1.0 - cur_rate;
-                if (newH <= 0.0)
-                {
-                    newH = delta_bias;
-                }
-                else
-                {
-                    newH = getHForBias(i, j) * newH + delta_bias;
-                }
-                setHForBias(i, j, newH);
-            }
-        }
-
-        for (j = 0; j < _neuronsPerLayerCount[0]; j++)
-        {
-            for (k = 0; k < nInputsCount; k++)
-            {
-                dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getH(0,j,k) * trainingInputs[k];
-                if (dB > 2.0)
-                {
-                    dB = 2.0;
-                }
-                else
-                {
-                    if (dB < -2.0)
-                    {
-                        dB = -2.0;
-                    }
-                }
-                setB(0,j,k, getB(0,j,k) + dB);
-
-                cur_rate = exp(getB(0,j,k));
-                //cur_rate = m_rate;
-
-                cur_input = trainingInputs[k];
-
-                delta_weight = cur_rate * cur_input * localGradients[indexByLayerAndNeuron(0, j)];
-                setWeight(0, j, k, getWeight(0, j, k) + delta_weight);
-
-                newH = 1.0 - cur_rate * cur_input * cur_input;
-                if (newH <= 0.0)
-                {
-                    newH = delta_weight;
-                }
-                else
-                {
-                    newH = getH(0,j,k) * newH + delta_weight;
-                }
-                setH(0,j,k, newH);
-            }
-        }
-    }
-    else
-    {
-        nInputsCount = _inputsInCurrentLayer[0];
-        // Для каждого нейрона слоя (цикл по j)
-        for (j = 0; j < _neuronsPerLayerCount[0]; j++)
-        {
-            cur_error = (trainingOutputs[j] - outputs[indexByLayerAndNeuron(0, j)]) * sample_weight;
-
-            // вычисляем локальный градиент
-            localGradients[indexByLayerAndNeuron(0, j)] = cur_error * derivatives[indexByLayerAndNeuron(0, j)];
-
-            dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getHForBias(0,j);
-            if (dB > 2.0)
-            {
-                dB = 2.0;
-            }
-            else
-            {
-                if (dB < -2.0)
-                {
-                    dB = -2.0;
-                }
-            }
-            setBForBias(0,j, getBForBias(0,j) + dB);
-            cur_rate = exp(getBForBias(0,j));
-
-            // корректируем смещение нейрона
-            delta_bias = cur_rate * localGradients[indexByLayerAndNeuron(0, j)];
-            setBias(0, j, getBias(0, j) + delta_bias);
-
-            // вычисляем новое значение параметра H для смещения
-            newH = 1.0 - cur_rate;
-            if (newH <= 0.0)
-            {
-                newH = delta_bias;
-            }
-            else
-            {
-                newH = getHForBias(0, j) * newH + delta_bias;
-            }
-            setHForBias(0, j, newH);
-
-            // Для всех входов j-го нейрона (цикл по k)
-            for (k = 0; k < nInputsCount; k++)
-            {
-                dB = speed * localGradients[indexByLayerAndNeuron(0, j)] * getH(0,j,k) * trainingInputs[k];
-                if (dB > 2.0)
-                {
-                    dB = 2.0;
-                }
-                else
-                {
-                    if (dB < -2.0)
-                    {
-                        dB = -2.0;
-                    }
-                }
-                setB(0, j, k, getB(0, j, k) + dB);
-
-                cur_rate = exp(getB(0, j, k));
-
-                cur_input = trainingInputs[k];
-
-                delta_weight = cur_rate * cur_input * localGradients[indexByLayerAndNeuron(0, j)];
-                setWeight(0,j,k, getWeight(0,j,k) + delta_weight);
-
-                newH = 1.0 - cur_rate * cur_input * cur_input;
-                if (newH <= 0.0)
-                {
-                    newH = delta_weight;
-                }
-                else
-                {
-                    newH = getH(0,j,k) * newH + delta_weight;
-                }
-                setH(0,j,k, newH);
-            }
-        }
-    }
-
-    delete[] localGradients;
-    delete[] outputs;
-    delete[] derivatives;
-}*/
-
 bool OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * trainingOutputs, int numEpoch, double speed, double minError)
 {
     double error = 0;
@@ -853,6 +617,8 @@ bool OpenNNL::_doEpochBP(int samplesCount, double * trainingInputs, double * tra
         memcpy(currentSampleOutputs, trainingOutputs+sample*_outputsCount, _outputsCount*sizeof(*currentSampleOutputs));
 
         error = _changeWeightsByBP(currentSampleInputs, currentSampleOutputs, speed, 1);
+
+        cout << "Error: " << error << endl;
     }
 
     delete[] currentSampleInputs;

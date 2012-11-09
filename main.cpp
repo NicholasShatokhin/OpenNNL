@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <iomanip>
+#include <time.h>
 
 #include "opennnl.h"
 #include "mnistfile.h"
@@ -22,6 +23,22 @@ int maxArrayElementsIndex(double array[], int count);
 void testNetwork1();
 void testNetwork2();
 
+void startTimer(struct timespec * tp)
+{
+    clock_gettime(CLOCK_MONOTONIC, tp);
+
+    cout << "Time: 0 ns" << endl;
+}
+
+void printTimerValue(struct timespec * tp)
+{
+    long int startTime = tp->tv_nsec;
+
+    clock_gettime(CLOCK_MONOTONIC, tp);
+
+    cout << "Time: " << tp->tv_nsec - startTime << " ns" << endl;
+}
+
 int main()
 {
     testNetwork1();
@@ -32,6 +49,8 @@ int main()
 
 void testNetwork1()
 {
+    struct timespec tp;
+
     int neuronsInLayers[LAYERS_COUNT] = {3, 10, 10, 2};
     double trainingInputs[TRAINING_SAMPLES_COUNT*INPUTS_COUNT] = {1.0, 	1.0, 	1.0,
                                                                   0.5, 	1.0, 	1.0,
@@ -94,18 +113,29 @@ void testNetwork1()
     double biases[25];
 
     for(int i=0;i<159;i++)
-        weights[i] = 0;
+        weights[i] = 0.1;
 
     for(int i=0;i<25;i++)
-        biases[i] = 0;
+        biases[i] = 0.1;
+
+    startTimer(&tp);
 
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
+
+    printTimerValue(&tp);
+
     //opennnl->randomizeWeightsAndBiases();
     opennnl->setWeightsAndBiases(weights, biases);
 
+    printTimerValue(&tp);
+
     opennnl->trainingBP(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
 
+    printTimerValue(&tp);
+
     opennnl->printDebugInfo();
+
+    printTimerValue(&tp);
 
     double inputs[INPUTS_COUNT];
     double outputs[OUTPUTS_COUNT];
@@ -126,7 +156,11 @@ void testNetwork1()
         cout << endl;
     }
 
+    printTimerValue(&tp);
+
     delete opennnl;
+
+    printTimerValue(&tp);
 
     cout << endl;
     cout << endl;
