@@ -229,7 +229,14 @@ inline double OpenNNL::activation_derivative(double x, TActivationKind kind)
     return ((kind == SIG) ? (2.0 / (temp * temp)):1.0);
 }
 
-double * OpenNNL::_calculateWorker(double *inpt)
+double * OpenNNL::_calculateSingle(double *inputs)
+{
+    _doCalculation(inputs, _outputs);
+
+    return _outputs;
+}
+
+void OpenNNL::_doCalculation(double *inpt, double * outputs)
 {
     int inputsCount;
     double * temp;
@@ -273,11 +280,9 @@ double * OpenNNL::_calculateWorker(double *inpt)
         delete[] temp;
     }
 
-    memcpy(_outputs, inputs, sizeof(*_outputs)*inputsCount);
+    memcpy(outputs, inputs, sizeof(*_outputs)*inputsCount);
 
     delete[] inputs;
-
-    return _outputs;
 }
 
 double * OpenNNL::calculate(double *inputs)
@@ -287,7 +292,7 @@ double * OpenNNL::calculate(double *inputs)
         memcpy(_inputs, inputs, _inputsCount*sizeof(*_inputs));
     }
 
-    return _calculateWorker(_inputs);
+    return _calculateSingle(_inputs);
 }
 
 double * OpenNNL::calculateRef(double *inputs)
@@ -295,7 +300,15 @@ double * OpenNNL::calculateRef(double *inputs)
     if(!inputs)
         inputs = _inputs;
 
-    return _calculateWorker(inputs);
+    return _calculateSingle(inputs);
+}
+
+void OpenNNL::calculate(double * inputs, double * outputs, int samplesCount)
+{
+    for(int i=0;i<samplesCount;i++)
+    {
+        _doCalculation(inputs+i*_inputsCount, outputs+i*_outputsCount);
+    }
 }
 
 void OpenNNL::calculateNeuronsOutputsAndDerivatives(double *inpt, double *outputs, double *derivatives)
@@ -357,24 +370,14 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
 
     calculateNeuronsOutputsAndDerivatives(trainingInputs, outputs, derivatives);
 
-    /*cout << "outputs:" << endl;
-    for(int i=0;i<_neuronsCount;i++)
-        cout << outputs[i] << endl;
-    cout << "------------" << endl;
-
-    cout << "derivatives:" << endl;
-    for(int i=0;i<_neuronsCount;i++)
-        cout << derivatives[i] << endl;
-    cout << "------------" << endl;*/
-    //cout << "errors: " << endl;
     for(int j=0;j<_neuronsPerLayerCount[_layersCount-1];j++) // cuda kernel
     {
         current_error = trainingOutputs[j] - outputs[indexByLayerAndNeuron(_layersCount-1, j)];
         localGradients[indexByLayerAndNeuron(_layersCount-1, j)] = current_error * sample_weight * derivatives[indexByLayerAndNeuron(_layersCount-1, j)];
-//cout << current_error * current_error << endl;
+
         error += current_error * current_error;
     }
-    //cout << "----------------" << endl;
+
     if(_layersCount > 1)
     {
         for(int i=_layersCount-2;i>=0;i--)
@@ -393,11 +396,6 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
             }
         }
     }
-
-    /*cout << "localGradients:" << endl;
-    for(int i=0;i<_neuronsCount;i++)
-        cout << localGradients[i] << endl;
-    cout << "------------" << endl;*/
 
     for(int j=0;j<_neuronsPerLayerCount[0];j++) // this and next cicle for cuda kernel (j*k threads)
     {
@@ -421,16 +419,6 @@ double OpenNNL::_changeWeightsByBP(double * trainingInputs, double *trainingOutp
             _neuronsBiases[indexByLayerAndNeuron(i, j)] -= speed * localGradients[indexByLayerAndNeuron(i, j)];
         }
     }
-
-    /*cout << "weights:" << endl;
-    for(int i=0;i<_weightsCount;i++)
-        cout << _neuronsInputsWeights[i] << endl;
-    cout << "------------" << endl;
-
-    cout << "biases:" << endl;
-    for(int i=0;i<_neuronsCount;i++)
-        cout << _neuronsBiases[i] << endl;
-    cout << "------------" << endl;*/
 
     delete[] localGradients;
     delete[] outputs;

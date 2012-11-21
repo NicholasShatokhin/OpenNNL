@@ -82,7 +82,8 @@ class OpenNNL
         inline double activation(double x, TActivationKind kind=SIG);
         inline double activation_derivative(double x, TActivationKind kind=SIG);
 
-        double * _calculateWorker(double * inputs); // worker for calculation network outputs
+        double * _calculateSingle(double * inputs); // worker for calculation network outputs
+        void _doCalculation(double * inputs, double * outputs);
         double _changeWeightsByBP(double * trainingInputs, double * trainingOutputs, double speed, double sample_weight=1.0);
         double _changeWeightsByIDBD(double * trainingInputs, double *trainingOutputs, double speed, double sample_weight=1.0);
 
@@ -118,6 +119,8 @@ class OpenNNL
 
         double * calculate(double * inputs=NULL);   // calculates network outputs and returns pointer to outputs array (copy 'inputs' data )
         double * calculateRef(double * inputs=NULL);    // calculates network outputs and returns pointer to outputs array (sets internal inputs array by 'inputs' ref - data must be alive while OpenNNL's object lives)
+
+        void calculate(double * inputs, double * outputs, int samplesCount);
 
         /*void training(int trainingSetSize, double ** trainingInputs, double **trainingOutputs, double speed, double error, int maxEpochs);
         void trainingByFile(const char * filename, double speed, double error, int maxEpochs);

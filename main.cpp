@@ -8,41 +8,37 @@
 
 using namespace std;
 
-#define INPUTS_COUNT 3
-#define LAYERS_COUNT 4
-#define OUTPUTS_COUNT 2
+#define REAL double
 
-#define TRAINING_SAMPLES_COUNT 21
-#define SPEED 0.015
-#define ERROR 0.005
-
-#define TEST_INPUTS_COUNT 9
-
-int maxArrayElementsIndex(double array[], int count);
+int maxArrayElementsIndex(REAL array[], int count);
 
 void testNetwork1();
-void testNetwork2();
+void testNetworkMnist(int epochCount);
+void prepareMnistDataAndTestNetwork();
 
 void startTimer(struct timespec * tp)
 {
-    clock_gettime(CLOCK_MONOTONIC, tp);
-
-    cout << "Time: 0 ns" << endl;
+    clock_gettime(CLOCK_MONOTONIC_RAW, tp);
 }
 
-void printTimerValue(struct timespec * tp)
+void printTimerValue(struct timespec * tp, const char * message = "")
 {
-    long int startTime = tp->tv_nsec;
 
-    clock_gettime(CLOCK_MONOTONIC, tp);
+    long int startTime = tp->tv_sec * 1000000000 + tp->tv_nsec;
 
-    cout << "Time: " << tp->tv_nsec - startTime << " ns" << endl;
+    clock_gettime(CLOCK_MONOTONIC_RAW, tp);
+
+    cout << message << ": time: " << tp->tv_sec * 1000000000 + tp->tv_nsec - startTime << " ns" << endl;
+
+    ofstream fout;
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    fout << message << ": time: " << tp->tv_sec * 1000000000 + tp->tv_nsec - startTime << " ns" << endl;
+    fout.close();
 }
 
 int main()
 {
-    testNetwork1();
-    //testNetwork2();
+    prepareMnistDataAndTestNetwork();
 
     return 0;
 }
@@ -51,8 +47,18 @@ void testNetwork1()
 {
     struct timespec tp;
 
+    const int INPUTS_COUNT = 3;
+    const int LAYERS_COUNT = 4;
+    const int OUTPUTS_COUNT = 2;
+
+    const int TRAINING_SAMPLES_COUNT = 21;
+    const REAL SPEED = 0.015;
+    const REAL ERROR = 0.005;
+
+    const int TEST_INPUTS_COUNT = 9;
+
     int neuronsInLayers[LAYERS_COUNT] = {3, 10, 10, 2};
-    double trainingInputs[TRAINING_SAMPLES_COUNT*INPUTS_COUNT] = {1.0, 	1.0, 	1.0,
+    REAL trainingInputs[TRAINING_SAMPLES_COUNT*INPUTS_COUNT] = {1.0, 	1.0, 	1.0,
                                                                   0.5, 	1.0, 	1.0,
                                                                   1.0, 	1.0, 	0.5,
                                                                   1.0, 	0.5, 	1.0,
@@ -73,7 +79,7 @@ void testNetwork1()
                                                                   0.6, 	0.3, 	0.0,
                                                                   0.2, 	0.3, 	0.4,
                                                                   0.4, 	0.3, 	0.2 };
-    double trainingOutputs[TRAINING_SAMPLES_COUNT*OUTPUTS_COUNT] = {
+    REAL trainingOutputs[TRAINING_SAMPLES_COUNT*OUTPUTS_COUNT] = {
                                                                            1.0, 	0.5,
                                                                            0.6, 	0.7,
                                                                            0.6, 	0.3,
@@ -97,7 +103,7 @@ void testNetwork1()
                                                                            0.4, 	0.1
                                                                    };
 
-    double testInputs[TEST_INPUTS_COUNT*INPUTS_COUNT] = {
+    REAL testInputs[TEST_INPUTS_COUNT*INPUTS_COUNT] = {
         0.0, 0.0, 0.0,
         1.0, 0.0, 1.0,
         0.0, 1.0, 0.5,
@@ -109,8 +115,8 @@ void testNetwork1()
         1.0, 1.0, 1.0
     };
 
-    double weights[159];
-    double biases[25];
+    REAL weights[159];
+    REAL biases[25];
 
     for(int i=0;i<159;i++)
         weights[i] = 0.1;
@@ -118,14 +124,23 @@ void testNetwork1()
     for(int i=0;i<25;i++)
         biases[i] = 0.1;
 
+
     startTimer(&tp);
 
+    cout << "Creating object..." << endl;
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
 
     printTimerValue(&tp);
 
-    //opennnl->randomizeWeightsAndBiases();
-    opennnl->setWeightsAndBiases(weights, biases);
+    cout << "Randomizing weights..." << endl;
+    //opennnl->randomizeWeights();
+    opennnl->setWeights(weights);
+
+    cout << "Randomizing biases..." << endl;
+    //opennnl->randomizeBiases();
+    opennnl->setBiases(biases);
+
+    cout << "Training..." << endl;
 
     printTimerValue(&tp);
 
@@ -135,14 +150,16 @@ void testNetwork1()
 
     opennnl->printDebugInfo();
 
-    printTimerValue(&tp);
+    cout << "Calculations..." << endl;
 
-    double inputs[INPUTS_COUNT];
-    double outputs[OUTPUTS_COUNT];
+    REAL inputs[INPUTS_COUNT];
+    REAL outputs[OUTPUTS_COUNT];
+
+    printTimerValue(&tp);
 
     for(int i=0;i<TEST_INPUTS_COUNT;i++)
     {
-        memcpy(inputs, testInputs+i*INPUTS_COUNT, INPUTS_COUNT*sizeof(double));
+        memcpy(inputs, testInputs+i*INPUTS_COUNT, INPUTS_COUNT*sizeof(REAL));
 
         opennnl->calculate(inputs);
         opennnl->getOutputs(outputs);
@@ -158,36 +175,90 @@ void testNetwork1()
 
     printTimerValue(&tp);
 
+    cout << "Deleting object..." << endl;
     delete opennnl;
 
     printTimerValue(&tp);
 
-    cout << endl;
-    cout << endl;
+    cout << "Done!" << endl;
 }
 
-void testNetwork2()
+void testNetworkMnist(int epochCount, int trainingSamplesCount, REAL * trainingInputs, REAL * trainingOutputs, int testSamplesCount, REAL * testInputs, REAL * testOutputs, unsigned char * labels, int layers_count, int inputs_count, int outputs_count, int * neuronsInLayers)
 {
     cout << "Creating network..." << endl;
-    const int layers_count = 3;
-    const int inputs_count = 784;
-    const int outputs_count = 10;
-    int neuronsInLayers[layers_count] = {300, 100, outputs_count};
+
+    struct timespec tp;
+    const REAL error = 0.005;
+    const REAL speed = 1 / (REAL) trainingSamplesCount;
+    int outputLabel, correctAnswers = 0;
+
+    startTimer(&tp);
 
     OpenNNL * opennnl = new OpenNNL(inputs_count, layers_count, neuronsInLayers);
+
+    printTimerValue(&tp, "Creating network");
+
     opennnl->randomizeWeightsAndBiases();
 
-    cout << "Preparing train data..." << endl;
+    printTimerValue(&tp, "randomizeWeightsAndBiases");
+
+    opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, epochCount, speed, error);
+
+    printTimerValue(&tp, "Training");
+
+    opennnl->calculate(testInputs, testOutputs, testSamplesCount);
+
+    printTimerValue(&tp, "Testing");
+
+    for(int i=0;i<testSamplesCount;i++)
+    {
+        outputLabel = maxArrayElementsIndex(testOutputs+i*outputs_count, outputs_count);
+        if(outputLabel == (int) labels[i])
+            correctAnswers++;
+        else
+        {
+            cout << i << ": Incorrect answer: " << outputLabel << " instead: " << (int) labels[i] << endl;
+
+            cout << "Outputs: " << setprecision(6);
+            for(int k=0;k<outputs_count;k++)
+            {
+                cout << testOutputs[i*outputs_count+k] << " ";
+            }
+            cout << endl;
+        }
+    }
+
+    cout << endl;
+    cout << "Correct answers " << correctAnswers << " from " << testSamplesCount << " labels" << endl;
+    REAL error_rate = 100.0 - ((REAL) correctAnswers) / ((REAL) testSamplesCount) * 100.0;
+    cout << "Error rate: " << error_rate << "%" << endl;
+
+    ofstream fout;
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    cout << "Error rate: " << error_rate << "%" << endl;
+    fout.close();
+
+    printTimerValue(&tp, "Check");
+
+    delete opennnl;
+
+    printTimerValue(&tp, "Delete");
+}
+
+void prepareMnistDataAndTestNetwork()
+{
+    const int inputs_count = 784;
+    const int outputs_count = 10;
 
     MnistFile images;
     MnistFile labels;
-    if(!images.openFile("../mnist/data/train-images.idx3-ubyte"))
+    if(!images.openFile("../OpenNNLCuda/data/mnist/train-images.idx3-ubyte"))
     {
         cout << "Couldn't find train images file" << endl;
         return;
     }
 
-    if(!labels.openFile("../mnist/data/train-labels.idx1-ubyte"))
+    if(!labels.openFile("../OpenNNLCuda/data/mnist/train-labels.idx1-ubyte"))
     {
         cout << "Couldn't find train labels file" << endl;
         return;
@@ -198,11 +269,10 @@ void testNetwork2()
     unsigned char * image = new unsigned char[images.getRows()*images.getCols()];
     unsigned char label;
 
-    const int trainingSamplesCount = 2000;//images.getLength();
-    const double speed = 1 / (double) trainingSamplesCount;
+    const int trainingSamplesCount = images.getLength();
 
-    double * trainingInputs = new double[trainingSamplesCount*inputs_count];
-    double * trainingOutputs = new double[trainingSamplesCount*outputs_count];
+    REAL * trainingInputs = new REAL[trainingSamplesCount*inputs_count];
+    REAL * trainingOutputs = new REAL[trainingSamplesCount*outputs_count];
 
     for(int i=0;i<trainingSamplesCount;i++)
     {
@@ -211,7 +281,7 @@ void testNetwork2()
 
         for(int j=0;j<inputs_count;j++)
         {
-            trainingInputs[i*inputs_count+j] = ((double) image[j] - 127.5) / 127.5;
+            trainingInputs[i*inputs_count+j] = ((REAL) image[j] - 127.5) / 127.5;
         }
 
         for(int k=0;k<label;k++)
@@ -224,80 +294,122 @@ void testNetwork2()
     images.closeFile();
     labels.closeFile();
 
-    cout << "Training..." << endl;
-
-    opennnl->trainingIDBD(trainingSamplesCount, trainingInputs, trainingOutputs, 1, speed, ERROR);
-
-    delete trainingInputs;
-    delete trainingOutputs;
-
-    if(!images.openFile("../mnist/data/t10k-images.idx3-ubyte"))
+    if(!images.openFile("../OpenNNLCuda/data/mnist/t10k-images.idx3-ubyte"))
     {
         cout << "Couldn't find test images file" << endl;
         return;
     }
 
-    if(!labels.openFile("../mnist/data/t10k-labels.idx1-ubyte"))
+    if(!labels.openFile("../OpenNNLCuda/data/mnist/t10k-labels.idx1-ubyte"))
     {
         cout << "Couldn't find test labels file" << endl;
         return;
     }
 
-    const int testSamplesCount = 500;//images.getLength();
+    const int testSamplesCount = images.getLength();
 
-    double * testInputs = new double[inputs_count];
-    double * testOutputs = new double[outputs_count];
-    int outputLabel, correctAnswers=0;
+    unsigned char * testLabels = new unsigned char[testSamplesCount];
 
-    cout << "Testing..." << endl;
+    REAL * testInputs = new REAL[inputs_count*testSamplesCount];
+    REAL * testOutputs = new REAL[outputs_count*testSamplesCount];
+
 
     for(int i=0;i<testSamplesCount;i++)
     {
         images.readRecord(image);
-        labels.readRecord(&label);
+        labels.readRecord(&testLabels[i]);
 
         for(int j=0;j<inputs_count;j++)
         {
-            testInputs[j] = ((double) image[j] - 127.5) / 127.5;
-        }
-
-        opennnl->calculate(testInputs);
-        opennnl->getOutputs(testOutputs);
-
-        outputLabel = maxArrayElementsIndex(testOutputs, outputs_count);
-        if(outputLabel == (int) label)
-            correctAnswers++;
-        else
-        {
-            cout << i << ": Incorrect answer: " << outputLabel << " instead: " << (int) label << endl;
-
-            cout << "Outputs: " << setprecision(30);
-            for(int k=0;k<outputs_count;k++)
-            {
-                cout << testOutputs[i] << " ";
-            }
-            cout << endl;
+            testInputs[i*inputs_count+j] = ((REAL) image[j] - 127.5) / 127.5;
         }
     }
 
     images.closeFile();
     labels.closeFile();
 
+    // 300
+    int layers_count = 2;
+    int neuronsInLayers1[2] = {300, outputs_count};
+
+    ofstream fout;
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    fout << "Layers: " << layers_count << "; 1 hidden layer: 300 neurons"  << endl;
+    fout.close();
+
+    for(int i=1;i<=10;i++)
+    {
+        fout.open("timing.txt", ios_base::out | ios_base::app);
+        fout << "Epochs: " << i << endl;
+        fout.close();
+
+        testNetworkMnist(i, trainingSamplesCount, trainingInputs, trainingOutputs, testSamplesCount, testInputs, testOutputs, testLabels, layers_count, inputs_count, outputs_count, neuronsInLayers1);
+    }
+
+    // 300x100
+    layers_count = 3;
+    int neuronsInLayers2[3] = {300, 100, outputs_count};
+
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    fout << "Layers: " << layers_count << "; 2 hidden layers: 300 and 100 neurons"  << endl;
+    fout.close();
+
+    for(int i=1;i<=10;i++)
+    {
+        fout.open("timing.txt", ios_base::out | ios_base::app);
+        fout << "Epochs: " << i << endl;
+        fout.close();
+
+        testNetworkMnist(i, trainingSamplesCount, trainingInputs, trainingOutputs, testSamplesCount, testInputs, testOutputs, testLabels, layers_count, inputs_count, outputs_count, neuronsInLayers2);
+    }
+
+    // 500x150
+    layers_count = 3;
+    int neuronsInLayers3[3] = {500, 150, outputs_count};
+
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    fout << "Layers: " << layers_count << "; 2 hidden layers: 500 and 150 neurons"  << endl;
+    fout.close();
+
+    for(int i=1;i<=10;i++)
+    {
+        fout.open("timing.txt", ios_base::out | ios_base::app);
+        fout << "Epochs: " << i << endl;
+        fout.close();
+
+        testNetworkMnist(i, trainingSamplesCount, trainingInputs, trainingOutputs, testSamplesCount, testInputs, testOutputs, testLabels, layers_count, inputs_count, outputs_count, neuronsInLayers3);
+    }
+
+    // 500x300
+    layers_count = 3;
+    int neuronsInLayers4[3] = {500, 300, outputs_count};
+
+    fout.open("timing.txt", ios_base::out | ios_base::app);
+    fout << "Layers: " << layers_count << "; 2 hidden layers: 500 and 300 neurons"  << endl;
+    fout.close();
+
+    for(int i=1;i<=10;i++)
+    {
+        fout.open("timing.txt", ios_base::out | ios_base::app);
+        fout << "Epochs: " << i << endl;
+        fout.close();
+
+        testNetworkMnist(i, trainingSamplesCount, trainingInputs, trainingOutputs, testSamplesCount, testInputs, testOutputs, testLabels, layers_count, inputs_count, outputs_count, neuronsInLayers4);
+    }
+
+    delete trainingInputs;
+    delete trainingOutputs;
+
     delete image;
+    delete testLabels;
 
     delete testInputs;
     delete testOutputs;
-
-    cout << endl;
-    cout << "Correct answers " << correctAnswers << " from " << testSamplesCount << " labels" << endl;
-    cout << "Error rate: " << 100.0 - ((double) correctAnswers) / ((double) testSamplesCount) * 100.0 << "%" << endl;
-
-    delete opennnl;
 }
 
-int maxArrayElementsIndex(double array[], int count)
+int maxArrayElementsIndex(REAL array[], int count)
 {
-    double maxElement = -10;
+    REAL maxElement = -10;
     int index = 0;
 
     for(int i=0;i<count;i++)
