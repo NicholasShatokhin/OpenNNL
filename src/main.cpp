@@ -1,14 +1,17 @@
-#include <iostream>
+#include <chrono>
 #include <cmath>
 #include <iomanip>
-#include <time.h>
+#include <iostream>
 
 #include "opennnl.h"
 #include "mnistfile.h"
 
 using namespace std;
 
+
 #define REAL double
+
+typedef std::chrono::time_point<std::chrono::system_clock> TimePoint;
 
 int maxArrayElementsIndex(REAL array[], int count);
 
@@ -16,23 +19,23 @@ void testNetwork1();
 void testNetworkMnist(int epochCount);
 void prepareMnistDataAndTestNetwork();
 
-void startTimer(struct timespec * tp)
+void startTimer(TimePoint& tp)
 {
-    clock_gettime(CLOCK_MONOTONIC_RAW, tp);
+    tp = TimePoint::clock::now();
 }
 
-void printTimerValue(struct timespec * tp, const char * message = "")
+void printTimerValue(TimePoint& tp, const char * message = "")
 {
+    long int startTime = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
 
-    long int startTime = tp->tv_sec * 1000000000 + tp->tv_nsec;
+    tp = TimePoint::clock::now();
+    long int  currentTime = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
 
-    clock_gettime(CLOCK_MONOTONIC_RAW, tp);
-
-    cout << message << ": time: " << tp->tv_sec * 1000000000 + tp->tv_nsec - startTime << " ns" << endl;
+    cout << message << ": time: " << currentTime << " ns" << endl;
 
     ofstream fout;
     fout.open("timing.txt", ios_base::out | ios_base::app);
-    fout << message << ": time: " << tp->tv_sec * 1000000000 + tp->tv_nsec - startTime << " ns" << endl;
+    fout << message << ": time: " << currentTime << " ns" << endl;
     fout.close();
 }
 
@@ -45,7 +48,7 @@ int main()
 
 void testNetwork1()
 {
-    struct timespec tp;
+    TimePoint tp;
 
     const int INPUTS_COUNT = 3;
     const int LAYERS_COUNT = 4;
@@ -125,12 +128,12 @@ void testNetwork1()
         biases[i] = 0.1;
 
 
-    startTimer(&tp);
+    startTimer(tp);
 
     cout << "Creating object..." << endl;
     OpenNNL * opennnl = new OpenNNL(INPUTS_COUNT, LAYERS_COUNT, neuronsInLayers);
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     cout << "Randomizing weights..." << endl;
     //opennnl->randomizeWeights();
@@ -142,11 +145,11 @@ void testNetwork1()
 
     cout << "Training..." << endl;
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     opennnl->trainingBP(TRAINING_SAMPLES_COUNT, trainingInputs, trainingOutputs, 1, SPEED, ERROR);
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     opennnl->printDebugInfo();
 
@@ -155,7 +158,7 @@ void testNetwork1()
     REAL inputs[INPUTS_COUNT];
     REAL outputs[OUTPUTS_COUNT];
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     for(int i=0;i<TEST_INPUTS_COUNT;i++)
     {
@@ -173,12 +176,12 @@ void testNetwork1()
         cout << endl;
     }
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     cout << "Deleting object..." << endl;
     delete opennnl;
 
-    printTimerValue(&tp);
+    printTimerValue(tp);
 
     cout << "Done!" << endl;
 }
@@ -187,28 +190,28 @@ void testNetworkMnist(int epochCount, int trainingSamplesCount, REAL * trainingI
 {
     cout << "Creating network..." << endl;
 
-    struct timespec tp;
+    TimePoint tp;
     const REAL error = 0.005;
     const REAL speed = 1 / (REAL) trainingSamplesCount;
     int outputLabel, correctAnswers = 0;
 
-    startTimer(&tp);
+    startTimer(tp);
 
     OpenNNL * opennnl = new OpenNNL(inputs_count, layers_count, neuronsInLayers);
 
-    printTimerValue(&tp, "Creating network");
+    printTimerValue(tp, "Creating network");
 
     opennnl->randomizeWeightsAndBiases();
 
-    printTimerValue(&tp, "randomizeWeightsAndBiases");
+    printTimerValue(tp, "randomizeWeightsAndBiases");
 
     opennnl->trainingBP(trainingSamplesCount, trainingInputs, trainingOutputs, epochCount, speed, error);
 
-    printTimerValue(&tp, "Training");
+    printTimerValue(tp, "Training");
 
     opennnl->calculate(testInputs, testOutputs, testSamplesCount);
 
-    printTimerValue(&tp, "Testing");
+    printTimerValue(tp, "Testing");
 
     for(int i=0;i<testSamplesCount;i++)
     {
@@ -238,11 +241,11 @@ void testNetworkMnist(int epochCount, int trainingSamplesCount, REAL * trainingI
     cout << "Error rate: " << error_rate << "%" << endl;
     fout.close();
 
-    printTimerValue(&tp, "Check");
+    printTimerValue(tp, "Check");
 
     delete opennnl;
 
-    printTimerValue(&tp, "Delete");
+    printTimerValue(tp, "Delete");
 }
 
 void prepareMnistDataAndTestNetwork()
@@ -397,14 +400,14 @@ void prepareMnistDataAndTestNetwork()
         testNetworkMnist(i, trainingSamplesCount, trainingInputs, trainingOutputs, testSamplesCount, testInputs, testOutputs, testLabels, layers_count, inputs_count, outputs_count, neuronsInLayers4);
     }
 
-    delete trainingInputs;
-    delete trainingOutputs;
+    delete[] trainingInputs;
+    delete[] trainingOutputs;
 
-    delete image;
-    delete testLabels;
+    delete[] image;
+    delete[] testLabels;
 
-    delete testInputs;
-    delete testOutputs;
+    delete[] testInputs;
+    delete[] testOutputs;
 }
 
 int maxArrayElementsIndex(REAL array[], int count)
