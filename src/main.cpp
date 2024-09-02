@@ -41,6 +41,7 @@ void printTimerValue(TimePoint& tp, const char * message = "")
 
 int main()
 {
+    //testNetwork1();
     prepareMnistDataAndTestNetwork();
 
     return 0;
