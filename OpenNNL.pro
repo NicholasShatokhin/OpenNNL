@@ -4,14 +4,14 @@ CONFIG -= qt
 
 LIBS += -lrt
 
-SOURCES += main.cpp \
-    opennnl.cpp \
-    mnistfile.cpp
+SOURCES += src/main.cpp \
+    src/opennnl.cpp \
+    src/mnistfile.cpp
 
 HEADERS += \
-    opennnl.h \
-    utils.h \
-    mnistfile.h
+    src/opennnl.h \
+    src/utils.h \
+    src/mnistfile.h
 
 OTHER_FILES += \
     data/mnist/train-labels.idx1-ubyte \
